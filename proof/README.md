@@ -40,3 +40,7 @@ Jobs `1` and `2` name database-only mock printer `402d1ec1-9db3-4df7-9dac-21f560
 Teardown exited successfully. No listeners remained on the owned API, Supabase, Redis, or slicing ports, and no owned engine, Redis, or Supabase containers remained. The shared Supabase containers stayed running. `node24-tests.log` records the same nine tests passing on Node 24.18.0.
 
 The Model the Domain principle shaped the order store: each selected plate owns one durable idempotency key and one creation request ID.
+
+## Browser UI
+
+[UI proof](ui/README.md) uses a separate loopback HTTP stub with a dummy key. It exercises the installed SDK through the example server and browser. Its screenshots and video cover automatic creation, manual release, and cancellation. This stub proof does not change the real API timing findings above.

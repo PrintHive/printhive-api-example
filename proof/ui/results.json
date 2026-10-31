@@ -1,0 +1,289 @@
+{
+  "results": [
+    {
+      "discovery": [
+        {
+          "tag": "INPUT",
+          "type": "file",
+          "id": "file",
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "type": "number",
+          "id": "plate",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "type": "select-one",
+          "id": "release-mode",
+          "text": "Manual · review firstAuto · queue when ready"
+        },
+        {
+          "tag": "INPUT",
+          "type": "number",
+          "id": "",
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "type": "text",
+          "id": "",
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "type": "color",
+          "id": "",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "type": "button",
+          "id": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "type": "button",
+          "id": "add-filament",
+          "text": "Add filament"
+        },
+        {
+          "tag": "INPUT",
+          "type": "text",
+          "id": "printer",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "type": "submit",
+          "id": "submit",
+          "text": "Submit order"
+        },
+        {
+          "tag": "BUTTON",
+          "type": "button",
+          "id": "release",
+          "text": "Release"
+        },
+        {
+          "tag": "BUTTON",
+          "type": "button",
+          "id": "cancel",
+          "text": "Cancel"
+        },
+        {
+          "tag": "BUTTON",
+          "type": "button",
+          "id": "refresh",
+          "text": "Refresh status"
+        }
+      ]
+    },
+    {
+      "phase": "rehearse",
+      "result": "PASS"
+    },
+    {
+      "phase": "record",
+      "result": "PASS"
+    }
+  ],
+  "events": [
+    {
+      "event": "submit",
+      "release": "automatic",
+      "plate": "1",
+      "filename": "cube.3mf"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "created"
+    },
+    {
+      "event": "submit",
+      "release": "manual",
+      "plate": "2",
+      "filename": "cube.3mf"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "held"
+    },
+    {
+      "event": "poll",
+      "status": "held"
+    },
+    {
+      "event": "release",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "created"
+    },
+    {
+      "event": "submit",
+      "release": "manual",
+      "plate": "1",
+      "filename": "cube.3mf"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "cancel",
+      "status": "cancelled"
+    },
+    {
+      "event": "poll",
+      "status": "cancelled"
+    },
+    {
+      "event": "submit",
+      "release": "automatic",
+      "plate": "1",
+      "filename": "cube.3mf"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "created"
+    },
+    {
+      "event": "submit",
+      "release": "manual",
+      "plate": "2",
+      "filename": "cube.3mf"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "held"
+    },
+    {
+      "event": "poll",
+      "status": "held"
+    },
+    {
+      "event": "poll",
+      "status": "held"
+    },
+    {
+      "event": "release",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "created"
+    },
+    {
+      "event": "submit",
+      "release": "manual",
+      "plate": "1",
+      "filename": "cube.3mf"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "poll",
+      "status": "preparing"
+    },
+    {
+      "event": "cancel",
+      "status": "cancelled"
+    },
+    {
+      "event": "poll",
+      "status": "cancelled"
+    }
+  ],
+  "scope": "Loopback stub only; no real API, credentials, or printers"
+}

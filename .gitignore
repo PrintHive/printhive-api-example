@@ -3,3 +3,4 @@ data/
 .env
 *.log
 !proof/*.log
+!proof/ui/*.log

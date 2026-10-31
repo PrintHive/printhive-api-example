@@ -66,6 +66,26 @@ curl --fail-with-body http://127.0.0.1:3000/orders/http-order-1001
 
 The server binds to loopback and has no customer authentication. Before exposing it, add your own authentication, order authorization, request limits, and a trusted design catalog. Do not accept arbitrary filesystem paths from customers. `PORT`, `ORDER_DATA_DIR`, and `DESIGN_DIR` configure the local sample.
 
+## Try an order in your browser
+
+With `PRINTHIVE_API_KEY` set privately on the server, run `npm start` and open <http://127.0.0.1:3000/>. The banner shows the destination from `PRINTHIVE_BASE_URL`, which defaults to `https://api.printhiv3d.com`.
+
+**Auto release in production queues a real print.** The form defaults to manual release so you can review the held request before authorizing it.
+
+1. Choose a `.3mf` file, or leave the upload empty to use `fixtures/cube.3mf`.
+2. Set the one-based plate number. Add filament requirements with zero-based source slots, material names, and colors.
+3. Optionally enter a printer ID. Leave it empty for Smart Queue assignment.
+4. Select the release mode and click **Submit order**.
+5. Follow the request ID and live status. For a manual hold, review **Required actions**, then click **Release**. Click **Cancel** to stop a request before job creation.
+
+The page polls once per second until `created`, `failed`, or `cancelled`. A held request keeps polling. A created receipt shows its job ID when the job still exists. Network errors leave the outcome unknown, and polling retries. If submission fails, **Retry same order** keeps the original ID and input to avoid a duplicate. Reload to change that input. **Start another order** clears the page without cancelling the previous order.
+
+Uploads use multipart `POST /orders` with an `order` JSON field and a `file` field. The server limits the entire request to 16 MiB, copies the source into the durable order store, and removes its temporary upload directory. JSON requests keep the existing 64 KiB limit. The browser uses only this server's routes and never receives the API key. `GET /config` returns the destination without URL credentials, query strings, or fragments.
+
+![Manual request held for review against the local fake API](proof/ui/manual-held.png)
+
+For a credential-free browser check, run the [UI proof script](proof/ui/README.md). It starts an HTTP stub on loopback and sets a dummy key. It never calls production.
+
 ## Authorize or cancel a manual request
 
 Set `release` to `"manual"` in a new order. The request prepares the plate and then reaches `held` with `requiredActions`. The CLI prints that receipt and exits with code 2.
@@ -99,7 +119,7 @@ A filament mismatch ordinarily creates a job with filament waiting reasons rathe
 npm test
 ```
 
-The tests cover plate mapping, persisted keys before submission, concurrent retries, restart recovery after a lost response, changed-intent rejection, manual requests, stopped receipts, and polling failure handling.
+The tests also cover multipart uploads, request size limits, malformed input, static assets, and sanitized configuration. The original tests cover plate mapping, persisted keys before submission, concurrent retries, restart recovery after a lost response, changed-intent rejection, manual requests, stopped receipts, and polling failure handling.
 
 `proof/run.mjs` drives this application against an already provisioned, owned local Hive API with mock printers. Set `PRINTHIVE_BASE_URL`, `PRINTHIVE_API_KEY`, and `MOCK_PRINTER_ID` privately, then run `npm run proof`. It rejects remote APIs. Provisioning the Hive stack and slicing engine is outside this public sample. Never point the proof runner at real printers. The proof transcript in `proof/local-e2e.log` records only selected response fields and no credentials.
 

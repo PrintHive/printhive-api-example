@@ -1,0 +1,21 @@
+✔ one durable key per plate; no printer required; concurrent retries do not duplicate (115.579667ms)
+✔ lost response survives restart with same key and original bytes (87.31225ms)
+✔ printer and manual authorization map to every plate (61.524542ms)
+✔ SDK polling exposes held receipt (0.612083ms)
+✔ SDK polling exposes failed receipt (0.103792ms)
+✔ SDK polling exposes cancelled receipt (0.056708ms)
+✔ created with deleted job is retained receipt; network timeout stays unsettled (0.215125ms)
+✔ invalid plates fail before a call (6.0505ms)
+✔ registry SDK sends multipart and raises stopped errors through real polling (22.419791ms)
+✔ multipart upload persists source bytes and supports status, release, and cancel (128.189875ms)
+✔ JSON bundled fixture and allowlisted page assets work without exposing URL secrets (78.137792ms)
+✔ bad input returns 400 before calling Print Hive (30.237292ms)
+✔ JSON and multipart request byte limits return 413 (38.236916ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 385.107042

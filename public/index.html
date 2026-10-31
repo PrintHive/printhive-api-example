@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PrintHive · Try a print order</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+<main>
+  <header><p class="eyebrow">PrintHive / API example</p><h1>Try a print order</h1><p>One project, one plate. Follow the request until a job is created.</p></header>
+  <aside id="target" role="status">Loading API destination…</aside>
+  <p id="warning" class="warning">Auto release in production queues a real print. Review your destination and release mode before submitting.</p>
+  <div class="layout">
+  <form id="order-form">
+    <h2>Prepare your order</h2>
+    <label for="file">Project 3MF</label>
+    <input id="file" type="file" accept=".3mf">
+    <p class="hint">Leave empty to use bundled cube.3mf. Upload limit: 16 MiB including form data.</p>
+    <div class="pair">
+      <div><label for="plate">Plate number</label><input id="plate" type="number" min="1" step="1" value="1" required></div>
+      <div><label for="release-mode">Release mode</label><select id="release-mode"><option value="manual">Manual · review first</option><option value="automatic">Auto · queue when ready</option></select></div>
+    </div>
+    <fieldset><legend>Filament requirements</legend><div id="filaments"></div><button type="button" id="add-filament" class="secondary">Add filament</button></fieldset>
+    <label for="printer">Printer ID (optional)</label><input id="printer" type="text" placeholder="Leave empty for Smart Queue">
+    <p class="hint">A created job may still wait for materials or printer readiness.</p>
+    <button id="submit" type="submit" disabled>Submit order</button>
+  </form>
+  <section aria-labelledby="status-heading">
+    <h2 id="status-heading">Request status</h2>
+    <p id="empty">Submit an order to see its request ID and live status.</p>
+    <div id="receipt" hidden>
+      <p id="state" class="state" role="status" aria-live="polite"></p>
+      <dl><dt>Order ID</dt><dd id="order-id"></dd><dt>Request ID</dt><dd id="request-id"></dd><dt>Job ID</dt><dd id="job-id">—</dd></dl>
+      <h3>Required actions</h3><pre id="actions">[]</pre>
+      <h3>Error</h3><pre id="failure">None</pre>
+      <div class="pair"><button type="button" id="release" hidden>Release</button><button type="button" id="cancel" class="secondary" hidden>Cancel</button></div>
+      <button type="button" id="refresh" class="secondary">Refresh status</button>
+    </div>
+    <p id="error" role="alert"></p>
+  </section>
+  </div>
+  <footer>Your API key stays on this server. This page sends requests only to this server.</footer>
+</main>
+<template id="filament-template"><div class="filament">
+  <label>Source slot<input data-field="sourceSlot" type="number" min="0" step="1" value="0" required></label>
+  <label>Material<input data-field="material" value="PETG" required></label>
+  <label>Color<input data-field="color" type="color" value="#39ff14"></label>
+  <button type="button" class="secondary remove" aria-label="Remove filament">Remove</button>
+</div></template>
+</body>
+</html>

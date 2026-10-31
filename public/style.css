@@ -1,0 +1,31 @@
+:root { color-scheme: light; font: 16px/1.5 system-ui, sans-serif; color: #0a0a0a; background: #f0eee9; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 1100px; margin: auto; padding: 32px 24px; }
+h1 { font-size: 2.2rem; line-height: 1.15; margin: 8px 0; letter-spacing: -.04em; }
+h2 { font-size: 1.2rem; margin: 0 0 20px; } h3 { font-size: .9rem; }
+p { margin: 8px 0 16px; } .eyebrow { color: #222525; font-weight: 650; font-size: .85rem; }
+aside { padding: 12px 16px; border: 1px solid #b2b8b8; background: #f0eee9; border-radius: 8px; overflow-wrap: anywhere; }
+.warning { padding: 12px 16px; background: #fff2d7; color: #0a0a0a; border-radius: 8px; }
+.layout { display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; margin-top: 24px; }
+form, section { min-width: 0; background: white; border: 1px solid #b2b8b8; border-radius: 8px; padding: 24px; }
+label, legend { display: block; font-size: .88rem; font-weight: 600; }
+input, select, button { font: inherit; border-radius: 4px; }
+input, select { display: block; width: 100%; min-width: 0; padding: 9px; margin: 6px 0 14px; border: 1px solid #848c8c; background: white; color: inherit; }
+input[type=color] { height: 44px; padding: 4px; }
+button { padding: 10px 14px; border: 1px solid #222525; background: #222525; color: white; cursor: pointer; font-weight: 600; }
+button.secondary { background: white; color: #222525; }
+button:disabled { opacity: .5; cursor: wait; }
+:focus-visible { outline: 3px solid #3577ba; outline-offset: 3px; }
+.pair { display: flex; gap: 14px; margin-bottom: 14px; } .pair > div { flex: 1; min-width: 0; }
+fieldset { border: 1px solid #b2b8b8; border-radius: 8px; padding: 12px; margin: 4px 0 18px; min-width: 0; }
+.filament { display: grid; grid-template-columns: 1fr 1.2fr 60px; gap: 10px; border-bottom: 1px solid #b2b8b8; margin-bottom: 12px; padding-bottom: 12px; }
+.remove { grid-column: 1 / -1; justify-self: start; font-size: .8rem; padding: 5px 10px; }
+.hint, footer { color: #505757; font-size: .82rem; }
+.state { font-weight: 700; color: #222525; font-size: 1.35rem; }
+dt { font-size: .8rem; color: #505757; } dd { margin: 0 0 12px; overflow-wrap: anywhere; font-family: monospace; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; background: #f0eee9; padding: 12px; border-radius: 4px; }
+#error { color: #a32620; } footer { margin-top: 24px; } [hidden] { display: none !important; }
+@media (max-width: 740px) { main { padding: 24px 16px; } .layout { grid-template-columns: 1fr; } form, section { padding: 18px; } }
+
+#submit { background: #39ff14; color: #0a0a0a; border-color: #0a0a0a; }

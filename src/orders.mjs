@@ -16,12 +16,15 @@ export function validateOrder(order) {
     !order.filaments.length ||
     !order.filaments.every(
       (f) =>
+        f &&
         Number.isInteger(f.sourceSlot) &&
         f.sourceSlot >= 0 &&
         typeof f.material === "string" &&
         f.material.length > 0 &&
         /^#[a-fA-F0-9]{6}$/.test(f.color),
     ) ||
+    (order.printer_id !== undefined &&
+      (typeof order.printer_id !== "string" || !order.printer_id.trim())) ||
     (order.release !== undefined &&
       !["manual", "automatic"].includes(order.release))
   ) {
