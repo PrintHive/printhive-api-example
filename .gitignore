@@ -7,3 +7,6 @@ data/
 proof/filament-mapping/*.png
 proof/filament-mapping/*.webm
 proof/filament-mapping/results.json
+proof/plate-extraction/*.png
+proof/plate-extraction/*.webm
+proof/plate-extraction/results.json

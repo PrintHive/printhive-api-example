@@ -48,3 +48,8 @@ summary { cursor: pointer; font-weight: 600; }
 @media (max-width: 430px) { .pair { flex-wrap: wrap; } .pair > div { flex-basis: 100%; } }
 
 .intent-fields { border: 0; margin: 0; padding: 0; }
+
+.palette-choice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; font-weight: 500; }
+.palette-choice input { display: inline-block; width: 18px; height: 18px; margin: 0; flex: 0 0 18px; }
+.palette-choice .hint { flex-basis: 100%; }
+#extraction-error { color: #a32620; font-size: .85rem; }

@@ -6,6 +6,10 @@ let busy = false;
 let ready = false;
 let bundled;
 let project;
+let extracted;
+let extractionController;
+const confirmedPlates = new Map();
+const usageDrafts = new Map();
 let sourceGeneration = 0;
 let previewGeneration = 0;
 const selections = new Map();
@@ -23,7 +27,8 @@ function element(tag, text, className) {
   if (className) node.className = className;
   return node;
 }
-function plate() { return project?.plates.find((p) => p.number === Number($('plate').value)); }
+function plate() { return extracted ? confirmedPlates.get(Number($('plate').value)) : project?.plates.find((p) => p.number === Number($('plate').value)); }
+function unavailablePlate(message) { const option = element('option', message); option.value = ''; $('plate').replaceChildren(option); $('plate').disabled = true; }
 function chosen() {
   const number = Number($('plate').value);
   if (!selections.has(number)) selections.set(number, new Map());
@@ -34,27 +39,33 @@ function invalidatePreview() {
   $('payload').textContent = 'Choose a Hive requirement for every source filament, then preview the API request.';
   updateButtons();
 }
-function complete() { return plate() && plate().filaments.every((f) => chosen().has(f.sourceSlot)); }
+function complete() { return plate()?.filaments.length > 0 && plate().filaments.every((f) => chosen().has(f.sourceSlot)); }
 function updateButtons() {
   $('submit').disabled = busy || !ready || (!active && !complete());
   $('preview').disabled = busy || Boolean(active) || !ready || !complete();
   $('intent-fields').disabled = busy || Boolean(active);
+  $('plate').disabled = !project || !(extracted?.plates.length || project.plates.length);
 }
 function resetProject() {
   sourceGeneration++;
+  extractionController?.abort();
+  extracted = null; confirmedPlates.clear(); usageDrafts.clear();
+  $('source-usage').hidden = true; $('source-palette').replaceChildren(); $('extraction-error').textContent = '';
   for (const controller of searches) controller.abort();
   searches.clear();
   project = null;
   selections.clear();
-  $('plate').replaceChildren();
+  unavailablePlate('Reading project…');
   $('filaments').replaceChildren();
-  $('project-summary').textContent = 'Load Printie’s plate data for this file before mapping filaments.';
+  $('project-summary').textContent = 'Reading plates and filament palette from the selected 3MF…';
   $('manifest').value = JSON.stringify(template, null, 2);
-  $('project-editor').open = true;
+  $('project-editor').open = false;
   $('project-error').textContent = '';
   invalidatePreview();
 }
 function showProject(value) {
+  extracted = null; confirmedPlates.clear(); usageDrafts.clear();
+  $('source-usage').hidden = true; $('extraction-error').textContent = '';
   project = value;
   $('plate').replaceChildren(...value.plates.map((p) => {
     const option = element('option', `Plate ${p.number}`); option.value = p.number; return option;
@@ -66,6 +77,7 @@ function showProject(value) {
 }
 async function applyProject() {
   const generation = ++sourceGeneration;
+  extractionController?.abort();
   try {
     const data = validateProjectData(JSON.parse($('manifest').value));
     const file = $('file').files[0];
@@ -78,18 +90,88 @@ async function applyProject() {
     showProject({ filename: file?.name ?? bundled.filename, sha256, ...data });
   } catch (error) {
     if (generation !== sourceGeneration) return;
-    project = null; selections.clear(); $('filaments').replaceChildren(); $('plate').replaceChildren();
+    project = null; extracted = null; confirmedPlates.clear(); selections.clear(); $('source-usage').hidden = true; $('filaments').replaceChildren(); unavailablePlate('Project data is not ready');
     $('project-error').textContent = error.message;
     $('project-summary').textContent = 'Project data is not ready.';
     invalidatePreview();
   }
 }
+function showExtracted(value) {
+  extracted = value;
+  project = { filename: value.filename, sha256: value.sha256, plates: [] };
+  confirmedPlates.clear(); usageDrafts.clear();
+  $('plate').replaceChildren(...value.plates.map((p) => { const option = element('option', `Plate ${p.number}`); option.value = p.number; return option; }));
+  $('project-summary').textContent = `${value.filename} · ${value.plates.length} plate${value.plates.length === 1 ? '' : 's'} extracted · confirm this plate’s source filaments below`;
+  $('manifest').value = '';
+  $('project-editor').open = false;
+  $('extraction-error').textContent = '';
+  renderFilaments();
+}
+function renderUsage() {
+  $('source-usage').hidden = !extracted;
+  $('source-palette').replaceChildren();
+  if (!extracted) return;
+  const number = Number($('plate').value);
+  if (!usageDrafts.has(number)) usageDrafts.set(number, new Set());
+  const draft = usageDrafts.get(number);
+  $('usage-warning').textContent = extracted.warnings.join(' ');
+  $('usage-status').textContent = confirmedPlates.has(number) ? `Source filaments confirmed for plate ${number}.` : `Select the palette entries used on plate ${number}, then confirm. No material usage has been assumed.`;
+  $('confirm-usage').disabled = draft.size === 0;
+  for (const filament of extracted.palette) {
+    const label = element('label', undefined, 'palette-choice');
+    const checkbox = element('input'); checkbox.type = 'checkbox'; checkbox.value = filament.sourceSlot; checkbox.dataset.paletteSlot = filament.sourceSlot;
+    checkbox.checked = draft.has(filament.sourceSlot); checkbox.disabled = !filament.selectable;
+    const description = `Source slot ${filament.sourceSlot} · ${filament.material || 'Unknown material'} · ${filament.color ?? 'Unknown color'}`;
+    label.append(checkbox, element('span', description));
+    if (!filament.selectable) label.append(element('span', filament.unavailableReason, 'hint'));
+    checkbox.onchange = () => {
+      if (checkbox.checked) draft.add(filament.sourceSlot); else draft.delete(filament.sourceSlot);
+      confirmedPlates.delete(number); selections.delete(number);
+      for (const controller of searches) controller.abort(); searches.clear();
+      $('filaments').replaceChildren();
+      $('confirm-usage').disabled = draft.size === 0;
+      $('usage-status').textContent = `Confirm the selected source filaments for plate ${number}.`;
+      invalidatePreview();
+    };
+    $('source-palette').append(label);
+  }
+}
+$('confirm-usage').onclick = () => {
+  if (!extracted) return;
+  const number = Number($('plate').value); const draft = usageDrafts.get(number);
+  const filaments = extracted.palette.filter((f) => f.selectable && draft?.has(f.sourceSlot)).map(({ sourceSlot, name, material, color }) => ({ sourceSlot, name, material, color }));
+  if (!filaments.length) return;
+  confirmedPlates.set(number, { number, filaments }); selections.delete(number);
+  renderFilaments();
+};
+async function inspectSelectedFile() {
+  resetProject();
+  const file = $('file').files[0];
+  if (!file) { if (bundled) { $('manifest').value = JSON.stringify({ plates: bundled.plates }, null, 2); showProject(bundled); } return; }
+  const generation = sourceGeneration;
+  const controller = new AbortController(); extractionController = controller;
+  try {
+    if (!/\.3mf$/i.test(file.name) || !file.size) throw new Error('Choose a nonempty .3mf project');
+    if (file.size > 16 * 1024 * 1024 - 65536) throw new Error('Choose a 3MF smaller than 16 MiB including form data');
+    const body = new FormData(); body.set('file', file);
+    const data = await api('/project-data/inspect', { method: 'POST', body, signal: controller.signal });
+    if (generation !== sourceGeneration || controller.signal.aborted) return;
+    showExtracted(data);
+  } catch (error) {
+    if (generation !== sourceGeneration || controller.signal.aborted) return;
+    unavailablePlate('Cannot read this project');
+    $('extraction-error').textContent = error.message;
+    $('project-summary').textContent = 'No plate data was accepted. Select a supported project or supply known data under Advanced.';
+    updateButtons();
+  } finally { if (extractionController === controller) extractionController = null; }
+}
 function renderFilaments() {
   for (const controller of searches) controller.abort();
   searches.clear();
   $('filaments').replaceChildren();
+  renderUsage();
   const selectedPlate = plate();
-  if (!selectedPlate) return;
+  if (!selectedPlate) { invalidatePreview(); return; }
   for (const source of selectedPlate.filaments) renderFilament(source, selectedPlate.number);
   invalidatePreview();
 }
@@ -159,7 +241,7 @@ function renderFilament(source, plateNumber) {
 }
 function currentInput() {
   const input = {
-    id: `browser-${crypto.randomUUID()}`, plates: [Number($('plate').value)], projectData: project,
+    id: `browser-${crypto.randomUUID()}`, plates: [Number($('plate').value)], projectData: { filename: project.filename, sha256: project.sha256, plates: [plate()] },
     mappings: plate().filaments.map((f) => ({ sourceSlot: f.sourceSlot, materialId: chosen().get(f.sourceSlot)?.id })),
     release: $('release-mode').value,
     ...($('printer').value.trim() ? { printer_id: $('printer').value.trim() } : {}),
@@ -177,7 +259,7 @@ $('preview').onclick = async () => {
     $('payload').textContent = JSON.stringify({ ...resolved, release: input.release, ...(input.printer_id ? { printer_id: input.printer_id } : {}) }, null, 2);
   } catch (error) { if (version === previewGeneration) $('payload').textContent = error.message; }
 };
-$('file').onchange = () => { resetProject(); if (!$('file').files.length && bundled) { $('manifest').value = JSON.stringify({ plates: bundled.plates }, null, 2); applyProject(); } };
+$('file').onchange = inspectSelectedFile;
 $('manifest-file').onchange = async () => {
   const file = $('manifest-file').files[0];
   if (!file) return;
@@ -185,7 +267,7 @@ $('manifest-file').onchange = async () => {
   try { if (file.size > 65536) throw new Error('Project data JSON must be smaller than 64 KiB'); const text = await file.text(); if (generation !== sourceGeneration) return; $('manifest').value = text; await applyProject(); }
   catch (error) { $('project-error').textContent = error.message; }
 };
-$('manifest').oninput = () => { sourceGeneration++; for (const controller of searches) controller.abort(); searches.clear(); project = null; selections.clear(); $('plate').replaceChildren(); $('filaments').replaceChildren(); invalidatePreview(); };
+$('manifest').oninput = () => { sourceGeneration++; extractionController?.abort(); extracted = null; confirmedPlates.clear(); usageDrafts.clear(); $('source-usage').hidden = true; for (const controller of searches) controller.abort(); searches.clear(); project = null; selections.clear(); unavailablePlate('Apply the known project data'); $('filaments').replaceChildren(); invalidatePreview(); };
 $('apply-manifest').onclick = applyProject;
 $('plate').onchange = renderFilaments;
 $('release-mode').onchange = invalidatePreview;

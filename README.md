@@ -129,12 +129,27 @@ The sample uses only public print-job create, poll, release, and cancel routes. 
 
 MIT. See [LICENSE](LICENSE).
 
-## Map Printie plate filaments to Hive requirements
+## Map plate filaments to Hive requirements
 
-Printie is responsible for processing its project and identifying the source filaments used by each plate. This example consumes that known data. It does not decode painted triangles or infer which palette entries a plate uses.
+Printie normally processes its own project files. This example bridges that step: selecting a 3MF uploads it to the local example backend, which extracts its actual Bambu plate numbers and filament palette. This operation creates no Hive request or print job and never executes embedded G-code.
 
-1. Choose a project 3MF. Changing the file clears the previous plate data and selections.
-2. Open **Printie project data**, then paste or import JSON in this shape:
+1. Choose a project 3MF. The plate selector shows **Reading project…** while extraction runs. Changing the file clears the previous plate data and requirement selections.
+2. Choose one of the extracted plates. The example reads plate identities from `Metadata/model_settings.config`, rather than guessing plate 1.
+3. Under **Source filaments used on this plate**, check the project palette entries used by the selected plate and click **Use these source filaments**. This small extractor does not decode painted triangles or prove a plate’s complete filament usage. The unchecked candidates are the project palette, not a claim that every palette entry is used. Confirm the known usage for each plate separately.
+4. For every confirmed source filament, search the real Hive catalog by name, brand, SKU, or exact Hive filament UUID. Explicitly choose a result. Use **More results** for the next page. Catalog presence does not establish printer compatibility or loaded inventory.
+5. Click **Preview API request** to resolve the selections and inspect the payload without creating a job. Submit only when you want to create an actual request.
+
+The bundled cube has known plate data and does not need an upload. Uploaded projects retain their original zero-based source filament indices. Switching plates preserves separate source confirmations and catalog selections. Changing a confirmation clears that plate’s previous requirements. Loading another file clears all of them. The browser rejects stale extraction responses after a file change.
+
+### Local extraction limits
+
+`POST /project-data/inspect` accepts one multipart `.3mf` file under the example’s 16 MiB total HTTP request limit. It uses pinned `yauzl` and `saxes` packages, reads only `Metadata/project_settings.config` and `Metadata/model_settings.config`, and never expands mesh geometry. Extraction rejects malformed ZIPs, unsafe or duplicate paths, encrypted entries, symbolic links, more than 1,000 archive entries, metadata documents exceeding 4 MiB of actual inflated bytes, invalid JSON, XML DTDs/entities, and XML exceeding 64 levels or 64,000 elements. Missing plate metadata produces an explicit error, not an invented plate option. Unknown or incomplete palette entries remain unselectable.
+
+The backend returns the exact uploaded-file SHA-256. The confirmed project data stays bound to that filename and hash; order submission verifies the bytes again. Only the selected plate’s confirmed source filaments enter the mapped order intent. Extracting metadata and confirming source usage do not approve or remove Hive’s own inspection holds.
+
+### Optional known Printie data
+
+If Printie already has authoritative per-plate data, open **Advanced: supply known Printie plate data** and paste or import JSON instead of confirming the extracted palette:
 
 ```json
 {
@@ -150,14 +165,13 @@ Printie is responsible for processing its project and identifying the source fil
 }
 ```
 
-3. Click **Use project data**. The browser binds the manifest to the selected file's SHA-256; submission verifies those bytes again on the server. The supplied data must describe this file. The bundled cube has its own known plate data.
-4. Choose a plate. Its source slots retain their original zero-based indices. Plate switching keeps separate selections; it never renumbers slots or copies another plate's requirements.
-5. For every source filament, search the real Hive catalog by name, brand, SKU, or an exact Hive filament UUID. Explicitly choose a result. Use **More results** for the next page. Catalog presence does not establish printer compatibility or loaded inventory.
-6. Click **Preview API request** to resolve the selections and inspect the payload without creating a job. Submit only when you want to create an actual request.
+Click **Use project data** to bind that manifest to the current file. Importing JSON is optional; it is not required to populate the plate selector after uploading a project.
 
-The public job API currently accepts `filaments: [{ sourceSlot, material, color, targetSlot? }]`. It does **not** accept material/filament IDs or SKUs in those rows. Selecting a catalog product resolves its material type and hex color into the supported fields. For a new order, the server resolves the ID before submission and keeps the catalog ID, name, and SKU in its durable order record. Unchanged retries reuse that saved catalog snapshot and the original idempotency key, even if the catalog is renamed or unavailable. Hive matches type and color; it does not require that exact product or SKU. A `PETG-CF` type stays `PETG-CF`, and missing or ambiguous colors cannot silently become a guessed color.
+### What the Hive API receives
 
-The example sends no `targetSlot`. When no printer is specified, Smart Queue determines the physical material routing later. Explicit printer selection retains the same requirement payload and still undergoes Hive's qualification and readiness checks.
+The public job API currently accepts `filaments: [{ sourceSlot, material, color, targetSlot? }]`. It does **not** accept material/filament IDs or SKUs in those rows. Selecting a catalog product resolves its material type and hex color into the supported fields. The server resolves the ID before first submission and keeps the catalog ID, name, and SKU in its durable order record. Replays retain that original snapshot even if the catalog changes or becomes unavailable. Hive matches type and color; it does not require that exact product or SKU. A `PETG-CF` type stays `PETG-CF`, and missing or ambiguous colors cannot silently become a guessed color.
+
+The example sends no `targetSlot`. When no printer is specified, Smart Queue determines the physical material routing later. Explicit printer selection retains the same requirement payload and still undergoes Hive’s qualification and readiness checks.
 
 SDK 0.2.0 has no catalog methods. The backend therefore uses a thin authenticated read-only adapter for `GET /v1/materials` and `GET /v1/materials/:id`. The browser talks only to the local `/catalog` proxy, which returns selected public catalog fields and never the API key. Search text is limited to 100 characters and paginated in pages of 20. The preview endpoint performs catalog reads only. Existing CLI callers can continue supplying typed filament requirements directly.
 

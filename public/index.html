@@ -18,19 +18,26 @@
     <fieldset id="intent-fields" class="intent-fields">
     <label for="file">Project 3MF</label>
     <input id="file" type="file" accept=".3mf">
-    <p class="hint">Leave empty to use bundled cube.3mf. Upload limit: 16 MiB including form data.</p>
+    <p class="hint">Select a 3MF to extract its plates and filament palette locally. Leave empty for the bundled cube. Upload limit: 16 MiB including form data.</p>
     <div class="pair">
-      <div><label for="plate">Plate</label><select id="plate" required></select></div>
+      <div><label for="plate">Plate</label><select id="plate" required disabled><option value="">Loading project…</option></select></div>
       <div><label for="release-mode">Release mode</label><select id="release-mode"><option value="manual">Manual · review first</option><option value="automatic">Auto · queue when ready</option></select></div>
     </div>
-    <details id="project-editor"><summary>Printie project data</summary>
-      <p class="hint">Printie supplies the filaments used by each plate after processing the project. Import that data here; this example does not infer painted material usage.</p>
+    <details id="project-editor"><summary>Advanced: supply known Printie plate data</summary>
+      <p class="hint">Optional: replace the extracted candidates with plate data Printie has already resolved. Uploading a 3MF populates its plate choices without this JSON step.</p>
       <label for="manifest-file">Import project data JSON</label><input id="manifest-file" type="file" accept=".json,application/json">
       <label for="manifest">Plate and source filament data</label><textarea id="manifest" rows="10" spellcheck="false"></textarea>
       <button type="button" id="apply-manifest" class="secondary">Use project data</button>
       <p id="project-error" role="alert"></p>
     </details>
     <p id="project-summary" class="hint" role="status">Loading Printie project data…</p>
+    <p id="extraction-error" role="alert"></p>
+    <fieldset id="source-usage" hidden><legend>Source filaments used on this plate</legend>
+      <p id="usage-warning" class="hint"></p>
+      <div id="source-palette"></div>
+      <button id="confirm-usage" type="button" class="secondary" disabled>Use these source filaments</button>
+      <p id="usage-status" class="hint" role="status"></p>
+    </fieldset>
     <fieldset><legend>Map this plate’s source filaments</legend>
       <p class="hint">Choose one Hive filament for every source filament. Hive currently matches material type and color; selecting a product does not require its exact SKU. Smart Queue chooses the physical slot.</p>
       <div id="filaments"></div>

@@ -1,3 +1,4 @@
+import { inspectProject } from "./project-inspection.mjs";
 import { createHash } from "node:crypto";
 import { validateCatalogQuery } from "./catalog.mjs";
 import { resolveMappedInput, validateMappedInput } from "./project-data.mjs";
@@ -61,6 +62,19 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
         try { validateCatalogQuery(search); } catch (error) { return reply(400, { error: error.message }); }
         try { return reply(200, await catalog.search(search)); }
         catch { return reply(502, { error: "Hive catalog lookup failed. Retry the search or check the filament ID." }); }
+      }
+      if (req.method === "POST" && pathname === "/project-data/inspect") {
+        if (!req.headers["content-type"]?.startsWith("multipart/form-data")) return reply(400, { error: "Upload the project as multipart/form-data" });
+        const body = await readBody(req, MAX_UPLOAD_BYTES);
+        let form;
+        try { form = await new Response(body, { headers: { "content-type": req.headers["content-type"] } }).formData(); }
+        catch { return reply(400, { error: "Project upload is not valid multipart data" }); }
+        const files = form.getAll("file");
+        const file = files[0];
+        if (files.length !== 1 || !file || typeof file === "string" || !file.size || !/\.3mf$/i.test(file.name)) return reply(400, { error: "Upload one nonempty .3mf project" });
+        const filename = basename(file.name.replaceAll("\\", "/"));
+        try { return reply(200, await inspectProject(Buffer.from(await file.arrayBuffer()), filename)); }
+        catch (error) { return reply(422, { error: error.message }); }
       }
       if (req.method === "GET" && pathname === "/project-data") {
         const bytes = await readFile(join(designs, "cube.3mf"));

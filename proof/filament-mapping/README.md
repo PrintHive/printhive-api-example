@@ -1,6 +1,6 @@
 # Production catalog and plate mapping proof
 
-This proof drives the example at `http://127.0.0.1:3077` with the real production API and PHJ server credential. The runner never reads the credential. Browser traffic stays on the example origin. The only permitted POST is `/orders/preview`, whose upstream work is authenticated catalog GET requests. Order creation, release, cancellation, and direct browser calls to production are blocked.
+This proof drives the example at `http://127.0.0.1:3077` with the real production API and PHJ server credential. The runner never reads the credential. Browser traffic stays on the example origin. The permitted POSTs are local project extraction and `/orders/preview`. Extraction reads local metadata; the preview performs authenticated catalog GET requests. Order creation, release, cancellation, and direct browser calls to production are blocked.
 
 Run with the example already running:
 
@@ -26,3 +26,5 @@ The proof covers:
 The older `proof/ui` fixture-backed recordings are historical and do not verify this production-connected mapping UI.
 
 The final exports were reviewed frame by frame: all 109 desktop frames and 30 mobile frames. The first capture cut off the preview, so capture was corrected to scroll it fully into view. Full-page screenshot capture briefly resized the recorded viewport; those capture-only frames were removed. All retained export frames were checked pixel-identical to the inspected frames. Future runs capture viewport screenshots while recording to avoid that resize.
+
+The automatic uploaded-file path is covered by [the plate extraction proof](../plate-extraction/README.md). This runner also retains coverage for Advanced partner-supplied data.

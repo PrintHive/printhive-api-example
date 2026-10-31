@@ -26,7 +26,7 @@ async function context(viewport, record) {
   const ctx = await browser.newContext({ viewport, ...(record ? { recordVideo: { dir: out, size: viewport } } : {}) });
   await ctx.route('**/*', route => {
     const req = route.request(), url = new URL(req.url());
-    const permitted = url.origin === new URL(base).origin && (['GET', 'HEAD'].includes(req.method()) || req.method() === 'POST' && url.pathname === '/orders/preview');
+    const permitted = url.origin === new URL(base).origin && (['GET', 'HEAD'].includes(req.method()) || req.method() === 'POST' && ['/orders/preview', '/project-data/inspect'].includes(url.pathname));
     requests.push({ method: req.method(), path: url.pathname + url.search });
     if (!permitted) { violations.push(`${req.method()} ${url.pathname}`); return route.abort('blockedbyclient'); }
     return route.continue();
@@ -64,6 +64,7 @@ async function choose(run, slot, item, byId = false) {
 async function project(run) {
   await run.page.locator('#file').setInputFiles(`${out}/three-plate.3mf`);
   expectCheck('Changing source clears prior mappings', await run.page.locator('.mapping').count() === 0 && await run.page.locator('#submit').isDisabled());
+  if (!await run.page.locator('#project-editor').evaluate(el => el.open)) await click(run, run.page.locator('summary'));
   await run.page.locator('#manifest').fill(JSON.stringify(manifest, null, 2));
   await click(run, run.page.locator('#apply-manifest'));
   await run.page.locator('#plate').selectOption('3');
