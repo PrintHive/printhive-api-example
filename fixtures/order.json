@@ -1,0 +1,14 @@
+{
+  "id": "order-1001",
+  "file": "fixtures/cube.3mf",
+  "plates": [
+    1
+  ],
+  "filaments": [
+    {
+      "sourceSlot": 0,
+      "material": "PETG",
+      "color": "#39FF14"
+    }
+  ]
+}

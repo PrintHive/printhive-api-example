@@ -1,0 +1,65 @@
+
+> printhive-api-example@1.0.0 proof
+> node proof/run.mjs
+
+{"check":"POST /orders","http":202,"id":"http-e975a23f-8d1d-4828-8be3-d3194b67f291","requests":[{"plate":1,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb"}]}
+{"check":"GET /orders","id":"http-e975a23f-8d1d-4828-8be3-d3194b67f291","plates":[{"plate":1,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","status":"preparing","externalId":null,"createdAt":"2026-10-31T15:45:56.528988+00:00","job":null,"requiredActions":[],"error":null}]}
+{"method":"GET","path":"/v1/print-jobs/create-requests/efc3a97b-4742-4626-8ac9-ab9595f84efb","http":200,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/efc3a97b-4742-4626-8ac9-ab9595f84efb","http":200,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/efc3a97b-4742-4626-8ac9-ab9595f84efb","http":200,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/efc3a97b-4742-4626-8ac9-ab9595f84efb","http":200,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/efc3a97b-4742-4626-8ac9-ab9595f84efb","http":200,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/efc3a97b-4742-4626-8ac9-ab9595f84efb","http":200,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/efc3a97b-4742-4626-8ac9-ab9595f84efb","http":200,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/efc3a97b-4742-4626-8ac9-ab9595f84efb","http":200,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/efc3a97b-4742-4626-8ac9-ab9595f84efb","http":200,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/efc3a97b-4742-4626-8ac9-ab9595f84efb","http":200,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/efc3a97b-4742-4626-8ac9-ab9595f84efb","http":200,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/efc3a97b-4742-4626-8ac9-ab9595f84efb","http":200,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/efc3a97b-4742-4626-8ac9-ab9595f84efb","http":200,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/efc3a97b-4742-4626-8ac9-ab9595f84efb","http":200,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/efc3a97b-4742-4626-8ac9-ab9595f84efb","http":200,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/efc3a97b-4742-4626-8ac9-ab9595f84efb","http":200,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/efc3a97b-4742-4626-8ac9-ab9595f84efb","http":200,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/efc3a97b-4742-4626-8ac9-ab9595f84efb","http":200,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/efc3a97b-4742-4626-8ac9-ab9595f84efb","http":200,"requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","status":"created","job":{"id":1,"printer_id":"402d1ec1-9db3-4df7-9dac-21f560d782c0","status":"QUEUED"},"requiredActions":[],"error":null}
+{"check":"automatic PASS","requestId":"efc3a97b-4742-4626-8ac9-ab9595f84efb","jobId":1,"mockPrinterId":"402d1ec1-9db3-4df7-9dac-21f560d782c0"}
+{"method":"POST","path":"/v1/print-jobs/create","http":202,"requestId":"58a402fb-7280-4e04-a48c-d451c9d0073d","status":"preparing","requiredActions":[],"error":null}
+{"check":"restart replay","order":"manual","requestId":"58a402fb-7280-4e04-a48c-d451c9d0073d"}
+{"method":"GET","path":"/v1/print-jobs/create-requests/58a402fb-7280-4e04-a48c-d451c9d0073d","http":200,"requestId":"58a402fb-7280-4e04-a48c-d451c9d0073d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/58a402fb-7280-4e04-a48c-d451c9d0073d","http":200,"requestId":"58a402fb-7280-4e04-a48c-d451c9d0073d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/58a402fb-7280-4e04-a48c-d451c9d0073d","http":200,"requestId":"58a402fb-7280-4e04-a48c-d451c9d0073d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/58a402fb-7280-4e04-a48c-d451c9d0073d","http":200,"requestId":"58a402fb-7280-4e04-a48c-d451c9d0073d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/58a402fb-7280-4e04-a48c-d451c9d0073d","http":200,"requestId":"58a402fb-7280-4e04-a48c-d451c9d0073d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/58a402fb-7280-4e04-a48c-d451c9d0073d","http":200,"requestId":"58a402fb-7280-4e04-a48c-d451c9d0073d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/58a402fb-7280-4e04-a48c-d451c9d0073d","http":200,"requestId":"58a402fb-7280-4e04-a48c-d451c9d0073d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/58a402fb-7280-4e04-a48c-d451c9d0073d","http":200,"requestId":"58a402fb-7280-4e04-a48c-d451c9d0073d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/58a402fb-7280-4e04-a48c-d451c9d0073d","http":200,"requestId":"58a402fb-7280-4e04-a48c-d451c9d0073d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/58a402fb-7280-4e04-a48c-d451c9d0073d","http":200,"requestId":"58a402fb-7280-4e04-a48c-d451c9d0073d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/58a402fb-7280-4e04-a48c-d451c9d0073d","http":200,"requestId":"58a402fb-7280-4e04-a48c-d451c9d0073d","status":"held","requiredActions":[{"code":"manual_release_required"}],"error":null}
+{"check":"manual held PASS","requestId":"58a402fb-7280-4e04-a48c-d451c9d0073d","requiredActions":[{"code":"manual_release_required"}]}
+{"check":"release","requestId":"58a402fb-7280-4e04-a48c-d451c9d0073d","response":{"authorized":true}}
+{"method":"GET","path":"/v1/print-jobs/create-requests/58a402fb-7280-4e04-a48c-d451c9d0073d","http":200,"requestId":"58a402fb-7280-4e04-a48c-d451c9d0073d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/58a402fb-7280-4e04-a48c-d451c9d0073d","http":200,"requestId":"58a402fb-7280-4e04-a48c-d451c9d0073d","status":"created","job":{"id":2,"printer_id":"402d1ec1-9db3-4df7-9dac-21f560d782c0","status":"QUEUED"},"requiredActions":[],"error":null}
+{"check":"manual released PASS","requestId":"58a402fb-7280-4e04-a48c-d451c9d0073d","jobId":2}
+{"method":"POST","path":"/v1/print-jobs/create","http":202,"requestId":"19c4df67-9a84-45f9-87c7-81d574d5bf69","status":"preparing","requiredActions":[],"error":null}
+{"check":"restart replay","order":"cancel","requestId":"19c4df67-9a84-45f9-87c7-81d574d5bf69"}
+{"check":"cancel","requestId":"19c4df67-9a84-45f9-87c7-81d574d5bf69","response":{"cancelled":true}}
+{"method":"GET","path":"/v1/print-jobs/create-requests/19c4df67-9a84-45f9-87c7-81d574d5bf69","http":200,"requestId":"19c4df67-9a84-45f9-87c7-81d574d5bf69","status":"cancelled","requiredActions":[],"error":null}
+{"check":"cancelled PASS","requestId":"19c4df67-9a84-45f9-87c7-81d574d5bf69"}
+{"method":"POST","path":"/v1/print-jobs/create","http":202,"requestId":"23d00cbe-9963-4f21-af01-1ff326fce27a","status":"preparing","requiredActions":[],"error":null}
+{"check":"restart replay","order":"smart-queue","requestId":"23d00cbe-9963-4f21-af01-1ff326fce27a"}
+{"method":"GET","path":"/v1/print-jobs/create-requests/23d00cbe-9963-4f21-af01-1ff326fce27a","http":200,"requestId":"23d00cbe-9963-4f21-af01-1ff326fce27a","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/23d00cbe-9963-4f21-af01-1ff326fce27a","http":200,"requestId":"23d00cbe-9963-4f21-af01-1ff326fce27a","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/23d00cbe-9963-4f21-af01-1ff326fce27a","http":200,"requestId":"23d00cbe-9963-4f21-af01-1ff326fce27a","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/23d00cbe-9963-4f21-af01-1ff326fce27a","http":200,"requestId":"23d00cbe-9963-4f21-af01-1ff326fce27a","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/23d00cbe-9963-4f21-af01-1ff326fce27a","http":200,"requestId":"23d00cbe-9963-4f21-af01-1ff326fce27a","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/23d00cbe-9963-4f21-af01-1ff326fce27a","http":200,"requestId":"23d00cbe-9963-4f21-af01-1ff326fce27a","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/23d00cbe-9963-4f21-af01-1ff326fce27a","http":200,"requestId":"23d00cbe-9963-4f21-af01-1ff326fce27a","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/23d00cbe-9963-4f21-af01-1ff326fce27a","http":200,"requestId":"23d00cbe-9963-4f21-af01-1ff326fce27a","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/23d00cbe-9963-4f21-af01-1ff326fce27a","http":200,"requestId":"23d00cbe-9963-4f21-af01-1ff326fce27a","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/23d00cbe-9963-4f21-af01-1ff326fce27a","http":200,"requestId":"23d00cbe-9963-4f21-af01-1ff326fce27a","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/23d00cbe-9963-4f21-af01-1ff326fce27a","http":200,"requestId":"23d00cbe-9963-4f21-af01-1ff326fce27a","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/23d00cbe-9963-4f21-af01-1ff326fce27a","http":200,"requestId":"23d00cbe-9963-4f21-af01-1ff326fce27a","status":"created","job":{"id":3,"printer_id":null,"status":"QUEUED"},"requiredActions":[],"error":null}
+{"check":"optional printer PASS","requestId":"23d00cbe-9963-4f21-af01-1ff326fce27a","jobId":3}
+{"result":"PASS","scope":"Job creation and queue admission only. No printer connection or motion."}

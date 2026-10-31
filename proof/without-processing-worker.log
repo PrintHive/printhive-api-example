@@ -1,0 +1,17 @@
+
+> printhive-api-example@1.0.0 proof
+> node proof/run.mjs
+
+{"method":"POST","path":"/v1/print-jobs/create","http":202,"requestId":"2676d7ce-51ca-4958-8d0b-6da55bdbf12d","status":"preparing","requiredActions":[],"error":null}
+{"check":"restart replay","order":"automatic","requestId":"2676d7ce-51ca-4958-8d0b-6da55bdbf12d"}
+{"method":"GET","path":"/v1/print-jobs/create-requests/2676d7ce-51ca-4958-8d0b-6da55bdbf12d","http":200,"requestId":"2676d7ce-51ca-4958-8d0b-6da55bdbf12d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/2676d7ce-51ca-4958-8d0b-6da55bdbf12d","http":200,"requestId":"2676d7ce-51ca-4958-8d0b-6da55bdbf12d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/2676d7ce-51ca-4958-8d0b-6da55bdbf12d","http":200,"requestId":"2676d7ce-51ca-4958-8d0b-6da55bdbf12d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/2676d7ce-51ca-4958-8d0b-6da55bdbf12d","http":200,"requestId":"2676d7ce-51ca-4958-8d0b-6da55bdbf12d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/2676d7ce-51ca-4958-8d0b-6da55bdbf12d","http":200,"requestId":"2676d7ce-51ca-4958-8d0b-6da55bdbf12d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/2676d7ce-51ca-4958-8d0b-6da55bdbf12d","http":200,"requestId":"2676d7ce-51ca-4958-8d0b-6da55bdbf12d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/2676d7ce-51ca-4958-8d0b-6da55bdbf12d","http":200,"requestId":"2676d7ce-51ca-4958-8d0b-6da55bdbf12d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/2676d7ce-51ca-4958-8d0b-6da55bdbf12d","http":200,"requestId":"2676d7ce-51ca-4958-8d0b-6da55bdbf12d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/2676d7ce-51ca-4958-8d0b-6da55bdbf12d","http":200,"requestId":"2676d7ce-51ca-4958-8d0b-6da55bdbf12d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/2676d7ce-51ca-4958-8d0b-6da55bdbf12d","http":200,"requestId":"2676d7ce-51ca-4958-8d0b-6da55bdbf12d","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/2676d7ce-51ca-4958-8d0b-6da55bdbf12d","http":200,"requestId":"2676d7ce-51ca-4958-8d0b-6da55bdbf12d","status":"failed","requiredActions":[],"error":{"error":"Conflict","reason":"model_file_not_ready","message":"Model File processing must finish before production starts","statusCode":409}}

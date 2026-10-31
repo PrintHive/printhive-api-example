@@ -1,0 +1,59 @@
+
+> printhive-api-example@1.0.0 test
+> node --test
+
+TAP version 13
+# Subtest: one durable key per plate; no printer required; concurrent retries do not duplicate
+ok 1 - one durable key per plate; no printer required; concurrent retries do not duplicate
+  ---
+  duration_ms: 77.26375
+  ...
+# Subtest: lost response survives restart with same key and original bytes
+ok 2 - lost response survives restart with same key and original bytes
+  ---
+  duration_ms: 37.635333
+  ...
+# Subtest: printer and manual authorization map to every plate
+ok 3 - printer and manual authorization map to every plate
+  ---
+  duration_ms: 34.794333
+  ...
+# Subtest: SDK polling exposes held receipt
+ok 4 - SDK polling exposes held receipt
+  ---
+  duration_ms: 0.305791
+  ...
+# Subtest: SDK polling exposes failed receipt
+ok 5 - SDK polling exposes failed receipt
+  ---
+  duration_ms: 0.067208
+  ...
+# Subtest: SDK polling exposes cancelled receipt
+ok 6 - SDK polling exposes cancelled receipt
+  ---
+  duration_ms: 0.0505
+  ...
+# Subtest: created with deleted job is retained receipt; network timeout stays unsettled
+ok 7 - created with deleted job is retained receipt; network timeout stays unsettled
+  ---
+  duration_ms: 0.16925
+  ...
+# Subtest: invalid plates fail before a call
+ok 8 - invalid plates fail before a call
+  ---
+  duration_ms: 1.658708
+  ...
+# Subtest: registry SDK sends multipart and raises stopped errors through real polling
+ok 9 - registry SDK sends multipart and raises stopped errors through real polling
+  ---
+  duration_ms: 16.53775
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 233.144417

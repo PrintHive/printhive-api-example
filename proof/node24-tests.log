@@ -1,0 +1,21 @@
+
+> printhive-api-example@1.0.0 test
+> node --test
+
+✔ one durable key per plate; no printer required; concurrent retries do not duplicate (42.024208ms)
+✔ lost response survives restart with same key and original bytes (38.155542ms)
+✔ printer and manual authorization map to every plate (37.996292ms)
+✔ SDK polling exposes held receipt (0.253791ms)
+✔ SDK polling exposes failed receipt (0.150291ms)
+✔ SDK polling exposes cancelled receipt (0.064167ms)
+✔ created with deleted job is retained receipt; network timeout stays unsettled (0.271625ms)
+✔ invalid plates fail before a call (1.259541ms)
+✔ registry SDK sends multipart and raises stopped errors through real polling (13.477667ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 191.745417

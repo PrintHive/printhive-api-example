@@ -1,0 +1,33 @@
+
+> printhive-api-example@1.0.0 proof
+> node proof/run.mjs
+
+{"method":"POST","path":"/v1/print-jobs/create","http":202,"requestId":"68a27708-d2f9-4cbd-b3d3-ea4152034f05","status":"preparing","requiredActions":[],"error":null}
+{"check":"restart replay","order":"automatic","requestId":"68a27708-d2f9-4cbd-b3d3-ea4152034f05"}
+{"method":"GET","path":"/v1/print-jobs/create-requests/68a27708-d2f9-4cbd-b3d3-ea4152034f05","http":200,"requestId":"68a27708-d2f9-4cbd-b3d3-ea4152034f05","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/68a27708-d2f9-4cbd-b3d3-ea4152034f05","http":200,"requestId":"68a27708-d2f9-4cbd-b3d3-ea4152034f05","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/68a27708-d2f9-4cbd-b3d3-ea4152034f05","http":200,"requestId":"68a27708-d2f9-4cbd-b3d3-ea4152034f05","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/68a27708-d2f9-4cbd-b3d3-ea4152034f05","http":200,"requestId":"68a27708-d2f9-4cbd-b3d3-ea4152034f05","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/68a27708-d2f9-4cbd-b3d3-ea4152034f05","http":200,"requestId":"68a27708-d2f9-4cbd-b3d3-ea4152034f05","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/68a27708-d2f9-4cbd-b3d3-ea4152034f05","http":200,"requestId":"68a27708-d2f9-4cbd-b3d3-ea4152034f05","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/68a27708-d2f9-4cbd-b3d3-ea4152034f05","http":200,"requestId":"68a27708-d2f9-4cbd-b3d3-ea4152034f05","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/68a27708-d2f9-4cbd-b3d3-ea4152034f05","http":200,"requestId":"68a27708-d2f9-4cbd-b3d3-ea4152034f05","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/68a27708-d2f9-4cbd-b3d3-ea4152034f05","http":200,"requestId":"68a27708-d2f9-4cbd-b3d3-ea4152034f05","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/68a27708-d2f9-4cbd-b3d3-ea4152034f05","http":200,"requestId":"68a27708-d2f9-4cbd-b3d3-ea4152034f05","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/68a27708-d2f9-4cbd-b3d3-ea4152034f05","http":200,"requestId":"68a27708-d2f9-4cbd-b3d3-ea4152034f05","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/68a27708-d2f9-4cbd-b3d3-ea4152034f05","http":200,"requestId":"68a27708-d2f9-4cbd-b3d3-ea4152034f05","status":"failed","requiredActions":[],"error":{"error":"Conflict","reason":"model_file_not_ready","message":"Model File processing must finish before production starts","statusCode":409}}
+{"check":"automatic FAIL","requestId":"68a27708-d2f9-4cbd-b3d3-ea4152034f05"}
+{"method":"POST","path":"/v1/print-jobs/create","http":202,"requestId":"e0328532-6c1e-4e05-b439-1ac208872caf","status":"preparing","requiredActions":[],"error":null}
+{"check":"restart replay","order":"manual","requestId":"e0328532-6c1e-4e05-b439-1ac208872caf"}
+{"method":"GET","path":"/v1/print-jobs/create-requests/e0328532-6c1e-4e05-b439-1ac208872caf","http":200,"requestId":"e0328532-6c1e-4e05-b439-1ac208872caf","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/e0328532-6c1e-4e05-b439-1ac208872caf","http":200,"requestId":"e0328532-6c1e-4e05-b439-1ac208872caf","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/e0328532-6c1e-4e05-b439-1ac208872caf","http":200,"requestId":"e0328532-6c1e-4e05-b439-1ac208872caf","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/e0328532-6c1e-4e05-b439-1ac208872caf","http":200,"requestId":"e0328532-6c1e-4e05-b439-1ac208872caf","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/e0328532-6c1e-4e05-b439-1ac208872caf","http":200,"requestId":"e0328532-6c1e-4e05-b439-1ac208872caf","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/e0328532-6c1e-4e05-b439-1ac208872caf","http":200,"requestId":"e0328532-6c1e-4e05-b439-1ac208872caf","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/e0328532-6c1e-4e05-b439-1ac208872caf","http":200,"requestId":"e0328532-6c1e-4e05-b439-1ac208872caf","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/e0328532-6c1e-4e05-b439-1ac208872caf","http":200,"requestId":"e0328532-6c1e-4e05-b439-1ac208872caf","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/e0328532-6c1e-4e05-b439-1ac208872caf","http":200,"requestId":"e0328532-6c1e-4e05-b439-1ac208872caf","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/e0328532-6c1e-4e05-b439-1ac208872caf","http":200,"requestId":"e0328532-6c1e-4e05-b439-1ac208872caf","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/e0328532-6c1e-4e05-b439-1ac208872caf","http":200,"requestId":"e0328532-6c1e-4e05-b439-1ac208872caf","status":"preparing","requiredActions":[],"error":null}
+{"method":"GET","path":"/v1/print-jobs/create-requests/e0328532-6c1e-4e05-b439-1ac208872caf","http":200,"requestId":"e0328532-6c1e-4e05-b439-1ac208872caf","status":"failed","requiredActions":[],"error":{"error":"Conflict","reason":"model_file_not_ready","message":"Model File processing must finish before production starts","statusCode":409}}

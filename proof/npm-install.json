@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "name": "printhive-api-example",
+  "dependencies": {
+    "@printhive/api": {
+      "version": "0.2.0",
+      "resolved": "https://registry.npmjs.org/@printhive/api/-/api-0.2.0.tgz",
+      "overridden": false
+    }
+  }
+}
