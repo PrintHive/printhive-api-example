@@ -135,7 +135,7 @@ Printie normally processes its own project files. This example bridges that step
 
 1. Choose a project 3MF. The plate selector shows **Reading project…** while extraction runs. Changing the file clears the previous plate data and requirement selections.
 2. Choose one of the extracted plates. The example reads plate identities from `Metadata/model_settings.config`, rather than guessing plate 1.
-3. Under **Source filaments used on this plate**, check the project palette entries used by the selected plate and click **Use these source filaments**. This small extractor does not decode painted triangles or prove a plate’s complete filament usage. The unchecked candidates are the project palette, not a claim that every palette entry is used. Confirm the known usage for each plate separately.
+3. Under **Source filaments used on this plate**, review the candidates and click **Use these source filaments**. When valid saved slice metadata identifies source slots, the UI initially filters to those entries and prechecks them. The label says **From saved slice metadata; confirm usage** because saved data can be stale or overinclusive. Use **Show all project filaments** to adjust the set. Extra entries you selected stay visible when the filter is restored. With missing, malformed, conflicting, out-of-range, or unsupported mixed-filament metadata, the UI shows the full palette with no entries assumed used. Confirm each plate separately. This small extractor does not decode painted triangles or prove a plate’s complete current usage.
 4. For every confirmed source filament, search the real Hive catalog by name, brand, SKU, or exact Hive filament UUID. Explicitly choose a result. Use **More results** for the next page. Catalog presence does not establish printer compatibility or loaded inventory.
 5. Click **Preview API request** to resolve the selections and inspect the payload without creating a job. Submit only when you want to create an actual request.
 
@@ -143,9 +143,13 @@ The bundled cube has known plate data and does not need an upload. Uploaded proj
 
 ### Local extraction limits
 
-`POST /project-data/inspect` accepts one multipart `.3mf` file under the example’s 16 MiB total HTTP request limit. It uses pinned `yauzl` and `saxes` packages, reads only `Metadata/project_settings.config` and `Metadata/model_settings.config`, and never expands mesh geometry. Extraction rejects malformed ZIPs, unsafe or duplicate paths, encrypted entries, symbolic links, more than 1,000 archive entries, metadata documents exceeding 4 MiB of actual inflated bytes, invalid JSON, XML DTDs/entities, and XML exceeding 64 levels or 64,000 elements. Missing plate metadata produces an explicit error, not an invented plate option. Unknown or incomplete palette entries remain unselectable.
+`POST /project-data/inspect` accepts one multipart `.3mf` file under the example’s 16 MiB total HTTP request limit. It uses pinned `yauzl` and `saxes` packages, reads `Metadata/project_settings.config`, `Metadata/model_settings.config`, optional `Metadata/plate_N.json` files, and optional `Metadata/slice_info.config`. It never expands mesh geometry. Extraction rejects malformed ZIPs, unsafe or duplicate paths, encrypted entries, symbolic links, more than 1,000 archive entries, metadata documents exceeding 4 MiB of actual inflated bytes or 16 MiB across all read metadata, invalid JSON, XML DTDs/entities, and XML exceeding 64 levels or 64,000 elements. Missing plate metadata produces an explicit error, not an invented plate option. Unknown or incomplete palette entries remain unselectable.
 
 The backend returns the exact uploaded-file SHA-256. The confirmed project data stays bound to that filename and hash; order submission verifies the bytes again. Only the selected plate’s confirmed source filaments enter the mapped order intent. Extracting metadata and confirming source usage do not approve or remove Hive’s own inspection holds.
+
+Saved plate JSON uses zero-based `filament_ids`; saved slice XML uses one-based `<filament id>` values and one-based plate indices. The extractor joins these by the actual plate number and preserves source identities rather than matching by color. Duplicate colors remain distinct source slots. Available cached type/color fields are checked against the current palette. Two conflicting saved datasets cause an unresolved fallback. Object extruder assignments and `filament_maps` are not treated as complete plate usage.
+
+Displayed colors have bordered swatches beside their readable hex values: source palette candidates, confirmed source filaments, catalog results and selected Hive requirements. JSON request previews and the optional data editor keep their literal copyable JSON and show an adjacent color legend.
 
 ### Optional known Printie data
 
@@ -178,3 +182,12 @@ SDK 0.2.0 has no catalog methods. The backend therefore uses a thin authenticate
 The HTTP mapped-order form adds `projectData` and `mappings: [{ sourceSlot, materialId }]` alongside its existing single selected plate. The backend verifies complete mappings, binds the source filename and hash, resolves the selected catalog entries, then calls the SDK with only the supported fields. Original source metadata and chosen catalog records remain part of immutable order intent, so a changed mapping conflicts with the same order ID.
 
 Source knowledge does not bypass inspection. An API hold such as `custom_instructions` or `material_usage_unresolved` remains a hold until Hive supports or completes the required review.
+
+### Saved usage format references
+
+The index conversions follow Bambu Studio's format at revision 79df7ae309be398ed30c9f397c13c9911c2edc57:
+
+- [Plate JSON export](https://github.com/bambulab/BambuStudio/blob/79df7ae309be398ed30c9f397c13c9911c2edc57/src/libslic3r/Format/bbs_3mf.cpp#L7168) and [ID/color population](https://github.com/bambulab/BambuStudio/blob/79df7ae309be398ed30c9f397c13c9911c2edc57/src/slic3r/GUI/Plater.cpp#L23975).
+- [Saved plate index](https://github.com/bambulab/BambuStudio/blob/79df7ae309be398ed30c9f397c13c9911c2edc57/src/libslic3r/Format/bbs_3mf.cpp#L8782) and [one-based filament IDs](https://github.com/bambulab/BambuStudio/blob/79df7ae309be398ed30c9f397c13c9911c2edc57/src/libslic3r/Format/bbs_3mf.cpp#L8901).
+
+These records describe saved slicing results. They can be absent, stale, or overinclusive, so the demo labels them as hints and still requires confirmation. It does not substitute object extruder assignments for a complete painting, support, or feature-level material analysis.

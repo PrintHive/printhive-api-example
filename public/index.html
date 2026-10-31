@@ -27,6 +27,7 @@
       <p class="hint">Optional: replace the extracted candidates with plate data Printie has already resolved. Uploading a 3MF populates its plate choices without this JSON step.</p>
       <label for="manifest-file">Import project data JSON</label><input id="manifest-file" type="file" accept=".json,application/json">
       <label for="manifest">Plate and source filament data</label><textarea id="manifest" rows="10" spellcheck="false"></textarea>
+      <div id="manifest-colors" class="color-legend" aria-label="Project data colors"></div>
       <button type="button" id="apply-manifest" class="secondary">Use project data</button>
       <p id="project-error" role="alert"></p>
     </details>
@@ -34,6 +35,7 @@
     <p id="extraction-error" role="alert"></p>
     <fieldset id="source-usage" hidden><legend>Source filaments used on this plate</legend>
       <p id="usage-warning" class="hint"></p>
+      <label id="show-all-label" class="palette-choice" hidden><input id="show-all-filaments" type="checkbox">Show all project filaments</label>
       <div id="source-palette"></div>
       <button id="confirm-usage" type="button" class="secondary" disabled>Use these source filaments</button>
       <p id="usage-status" class="hint" role="status"></p>
@@ -46,6 +48,7 @@
     <p class="hint">A created job may still wait for materials or printer readiness.</p>
     </fieldset>
     <button id="preview" type="button" class="secondary" disabled>Preview API request</button>
+    <div id="payload-colors" class="color-legend" aria-label="Request preview colors"></div>
     <pre id="payload" aria-label="API request preview">Choose a Hive requirement for every source filament.</pre>
     <button id="submit" type="submit" disabled>Submit order</button>
   </form>
@@ -55,8 +58,8 @@
     <div id="receipt" hidden>
       <p id="state" class="state" role="status" aria-live="polite"></p>
       <dl><dt>Order ID</dt><dd id="order-id"></dd><dt>Request ID</dt><dd id="request-id"></dd><dt>Job ID</dt><dd id="job-id">—</dd></dl>
-      <h3>Required actions</h3><pre id="actions">[]</pre>
-      <h3>Error</h3><pre id="failure">None</pre>
+      <h3>Required actions</h3><div id="actions-colors" class="color-legend" aria-label="Required action colors"></div><pre id="actions">[]</pre>
+      <h3>Error</h3><div id="failure-colors" class="color-legend" aria-label="Reported error colors"></div><pre id="failure">None</pre>
       <div class="pair"><button type="button" id="release" hidden>Release</button><button type="button" id="cancel" class="secondary" hidden>Cancel</button></div>
       <button type="button" id="refresh" class="secondary">Refresh status</button>
     </div>

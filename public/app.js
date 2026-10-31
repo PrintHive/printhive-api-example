@@ -1,4 +1,4 @@
-import { validateProjectData, validateMappedInput } from '/project-data.mjs';
+import { validateProjectData, validateMappedInput, normalizeColor } from '/project-data.mjs';
 const $ = (id) => document.getElementById(id);
 let active;
 let timer;
@@ -10,6 +10,7 @@ let extracted;
 let extractionController;
 const confirmedPlates = new Map();
 const usageDrafts = new Map();
+const usageViews = new Map();
 let sourceGeneration = 0;
 let previewGeneration = 0;
 const selections = new Map();
@@ -27,6 +28,40 @@ function element(tag, text, className) {
   if (className) node.className = className;
   return node;
 }
+function colorSwatch(value) {
+  const color = normalizeColor(value);
+  if (!color) return null;
+  const swatch = element('span', undefined, 'swatch');
+  swatch.style.backgroundColor = color;
+  swatch.setAttribute('aria-hidden', 'true');
+  return swatch;
+}
+function colorLabel(value, label = '') {
+  const group = element('span', undefined, 'color-value');
+  if (label) group.append(element('span', label));
+  const swatch = colorSwatch(value);
+  if (swatch) group.append(swatch);
+  group.append(element('code', normalizeColor(value) ? value : 'Unknown color'));
+  return group;
+}
+function renderManifestColors() {
+  $('manifest-colors').replaceChildren();
+  try {
+    const data = JSON.parse($('manifest').value);
+    for (const plate of data.plates ?? []) for (const source of plate.filaments ?? []) {
+      if (normalizeColor(source.color)) $('manifest-colors').append(colorLabel(source.color, `Plate ${plate.number} source slot ${source.sourceSlot}`));
+    }
+  } catch { /* Incomplete JSON has no color summary until it can be read. */ }
+}
+function renderReportedColors(target, value) {
+  target.replaceChildren();
+  function visit(node) {
+    if (typeof node === 'string' && normalizeColor(node)) target.append(colorLabel(node, 'Reported color'));
+    else if (Array.isArray(node)) node.forEach(visit);
+    else if (node && typeof node === 'object') Object.values(node).forEach(visit);
+  }
+  visit(value);
+}
 function plate() { return extracted ? confirmedPlates.get(Number($('plate').value)) : project?.plates.find((p) => p.number === Number($('plate').value)); }
 function unavailablePlate(message) { const option = element('option', message); option.value = ''; $('plate').replaceChildren(option); $('plate').disabled = true; }
 function chosen() {
@@ -36,6 +71,7 @@ function chosen() {
 }
 function invalidatePreview() {
   previewGeneration++;
+  $('payload-colors').replaceChildren();
   $('payload').textContent = 'Choose a Hive requirement for every source filament, then preview the API request.';
   updateButtons();
 }
@@ -49,7 +85,7 @@ function updateButtons() {
 function resetProject() {
   sourceGeneration++;
   extractionController?.abort();
-  extracted = null; confirmedPlates.clear(); usageDrafts.clear();
+  extracted = null; confirmedPlates.clear(); usageDrafts.clear(); usageViews.clear();
   $('source-usage').hidden = true; $('source-palette').replaceChildren(); $('extraction-error').textContent = '';
   for (const controller of searches) controller.abort();
   searches.clear();
@@ -59,12 +95,14 @@ function resetProject() {
   $('filaments').replaceChildren();
   $('project-summary').textContent = 'Reading plates and filament palette from the selected 3MF…';
   $('manifest').value = JSON.stringify(template, null, 2);
+  renderManifestColors();
   $('project-editor').open = false;
   $('project-error').textContent = '';
   invalidatePreview();
 }
 function showProject(value) {
-  extracted = null; confirmedPlates.clear(); usageDrafts.clear();
+  renderManifestColors();
+  extracted = null; confirmedPlates.clear(); usageDrafts.clear(); usageViews.clear();
   $('source-usage').hidden = true; $('extraction-error').textContent = '';
   project = value;
   $('plate').replaceChildren(...value.plates.map((p) => {
@@ -99,46 +137,57 @@ async function applyProject() {
 function showExtracted(value) {
   extracted = value;
   project = { filename: value.filename, sha256: value.sha256, plates: [] };
-  confirmedPlates.clear(); usageDrafts.clear();
+  confirmedPlates.clear(); usageDrafts.clear(); usageViews.clear();
   $('plate').replaceChildren(...value.plates.map((p) => { const option = element('option', `Plate ${p.number}`); option.value = p.number; return option; }));
   $('project-summary').textContent = `${value.filename} · ${value.plates.length} plate${value.plates.length === 1 ? '' : 's'} extracted · confirm this plate’s source filaments below`;
   $('manifest').value = '';
+  renderManifestColors();
   $('project-editor').open = false;
   $('extraction-error').textContent = '';
   renderFilaments();
 }
+function canConfirmUsage(draft) { return draft.size > 0 && extracted.palette.filter((f) => draft.has(f.sourceSlot)).length === draft.size && extracted.palette.filter((f) => draft.has(f.sourceSlot)).every((f) => f.selectable); }
 function renderUsage() {
   $('source-usage').hidden = !extracted;
   $('source-palette').replaceChildren();
   if (!extracted) return;
   const number = Number($('plate').value);
-  if (!usageDrafts.has(number)) usageDrafts.set(number, new Set());
+  const usage = extracted.plates.find((p) => p.number === number)?.usage;
+  const detected = usage?.kind === 'detected';
+  if (!usageDrafts.has(number)) usageDrafts.set(number, new Set(detected ? usage.sourceSlots : []));
+  if (!usageViews.has(number)) usageViews.set(number, false);
   const draft = usageDrafts.get(number);
-  $('usage-warning').textContent = extracted.warnings.join(' ');
-  $('usage-status').textContent = confirmedPlates.has(number) ? `Source filaments confirmed for plate ${number}.` : `Select the palette entries used on plate ${number}, then confirm. No material usage has been assumed.`;
-  $('confirm-usage').disabled = draft.size === 0;
-  for (const filament of extracted.palette) {
+  $('show-all-label').hidden = !detected;
+  $('show-all-filaments').checked = usageViews.get(number);
+  const evidenceNote = detected ? 'From saved slice metadata; confirm usage. Saved metadata can be stale. ' : 'Plate usage is unresolved, so all project palette entries are shown. ' ;
+  $('usage-warning').textContent = evidenceNote + extracted.warnings.join(' ');
+  $('usage-status').textContent = confirmedPlates.has(number) ? `Source filaments confirmed for plate ${number}.` : detected ? `Confirm the detected source filaments for plate ${number}, or show all project filaments to adjust them.` : `Select the palette entries used on plate ${number}, then confirm. No material usage has been assumed.`;
+  $('confirm-usage').disabled = !canConfirmUsage(draft);
+  const visibleSlots = detected && !usageViews.get(number) ? new Set([...usage.sourceSlots, ...draft]) : null;
+  for (const filament of extracted.palette.filter((f) => !visibleSlots || visibleSlots.has(f.sourceSlot))) {
     const label = element('label', undefined, 'palette-choice');
     const checkbox = element('input'); checkbox.type = 'checkbox'; checkbox.value = filament.sourceSlot; checkbox.dataset.paletteSlot = filament.sourceSlot;
     checkbox.checked = draft.has(filament.sourceSlot); checkbox.disabled = !filament.selectable;
-    const description = `Source slot ${filament.sourceSlot} · ${filament.material || 'Unknown material'} · ${filament.color ?? 'Unknown color'}`;
-    label.append(checkbox, element('span', description));
+    const description = `Source slot ${filament.sourceSlot} · ${filament.material || 'Unknown material'}`;
+    label.append(checkbox, element('span', description), colorLabel(filament.color));
     if (!filament.selectable) label.append(element('span', filament.unavailableReason, 'hint'));
     checkbox.onchange = () => {
       if (checkbox.checked) draft.add(filament.sourceSlot); else draft.delete(filament.sourceSlot);
       confirmedPlates.delete(number); selections.delete(number);
       for (const controller of searches) controller.abort(); searches.clear();
       $('filaments').replaceChildren();
-      $('confirm-usage').disabled = draft.size === 0;
+      $('confirm-usage').disabled = !canConfirmUsage(draft);
       $('usage-status').textContent = `Confirm the selected source filaments for plate ${number}.`;
       invalidatePreview();
     };
     $('source-palette').append(label);
   }
 }
+$('show-all-filaments').onchange = () => { usageViews.set(Number($('plate').value), $('show-all-filaments').checked); renderUsage(); };
 $('confirm-usage').onclick = () => {
   if (!extracted) return;
   const number = Number($('plate').value); const draft = usageDrafts.get(number);
+  if (!draft || !canConfirmUsage(draft)) return;
   const filaments = extracted.palette.filter((f) => f.selectable && draft?.has(f.sourceSlot)).map(({ sourceSlot, name, material, color }) => ({ sourceSlot, name, material, color }));
   if (!filaments.length) return;
   confirmedPlates.set(number, { number, filaments }); selections.delete(number);
@@ -179,12 +228,14 @@ function renderFilament(source, plateNumber) {
   const row = element('div', undefined, 'mapping');
   row.dataset.sourceSlot = source.sourceSlot;
   const heading = element('h3', `${source.name ?? 'Project filament'} · source slot ${source.sourceSlot}`);
-  const sourceLine = element('p', `Source: ${source.material} · ${source.color}`, 'source-line');
-  const swatch = element('span', undefined, 'swatch'); swatch.style.backgroundColor = source.color; swatch.setAttribute('aria-hidden', 'true'); sourceLine.prepend(swatch);
+  const sourceLine = element('p', undefined, 'source-line');
+  sourceLine.append(element('span', `Source: ${source.material}`), colorLabel(source.color));
   const selected = element('p', undefined, 'selection');
   function showSelection() {
     const value = selections.get(plateNumber)?.get(source.sourceSlot);
-    selected.textContent = value ? `Requirement: ${value.brand ?? ''} ${value.name} · ${value.materialType} · ${value.color}${value.sku ? ` · SKU ${value.sku}` : ''} · ID ${value.id}` : 'No Hive requirement selected';
+    selected.replaceChildren();
+    if (!value) { selected.textContent = 'No Hive requirement selected'; return; }
+    selected.append(element('span', `Requirement: ${value.brand ?? ''} ${value.name} · ${value.materialType}`), colorLabel(value.color), element('span', `${value.sku ? `SKU ${value.sku} · ` : ''}ID ${value.id}`));
   }
   showSelection();
   const label = element('label', 'Find a Hive filament by name, SKU, or ID');
@@ -214,7 +265,10 @@ function renderFilament(source, plateNumber) {
       status.textContent = data.materials.length ? `${data.total} results · showing ${data.offset + 1}–${data.offset + data.materials.length}` : 'No matching catalog filaments. Try a name, SKU, or ID.';
       for (const item of data.materials) {
         const card = element('div', undefined, 'catalog-item');
-        card.append(element('strong', `${item.brand ?? ''} ${item.name}`.trim()), element('span', `${item.materialType || 'Unknown material'} · ${item.color ?? 'No single hex color'}${item.sku ? ` · SKU ${item.sku}` : ''}`), element('code', item.id));
+        const characteristics = element('div', undefined, 'catalog-characteristics');
+        characteristics.append(element('span', item.materialType || 'Unknown material'), colorLabel(item.color));
+        if (item.sku) characteristics.append(element('span', `SKU ${item.sku}`));
+        card.append(element('strong', `${item.brand ?? ''} ${item.name}`.trim()), characteristics, element('code', item.id));
         const use = element('button', `Use ${item.name}`, 'secondary'); use.type = 'button'; use.disabled = !item.selectable;
         use.onclick = () => {
           chosen().set(source.sourceSlot, item); showSelection(); invalidatePreview();
@@ -257,6 +311,7 @@ $('preview').onclick = async () => {
     const resolved = await api('/orders/preview', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) });
     if (version !== previewGeneration) return;
     $('payload').textContent = JSON.stringify({ ...resolved, release: input.release, ...(input.printer_id ? { printer_id: input.printer_id } : {}) }, null, 2);
+    $('payload-colors').replaceChildren(...resolved.filaments.map((f) => colorLabel(f.color, `Source slot ${f.sourceSlot} requirement`)));
   } catch (error) { if (version === previewGeneration) $('payload').textContent = error.message; }
 };
 $('file').onchange = inspectSelectedFile;
@@ -267,7 +322,7 @@ $('manifest-file').onchange = async () => {
   try { if (file.size > 65536) throw new Error('Project data JSON must be smaller than 64 KiB'); const text = await file.text(); if (generation !== sourceGeneration) return; $('manifest').value = text; await applyProject(); }
   catch (error) { $('project-error').textContent = error.message; }
 };
-$('manifest').oninput = () => { sourceGeneration++; extractionController?.abort(); extracted = null; confirmedPlates.clear(); usageDrafts.clear(); $('source-usage').hidden = true; for (const controller of searches) controller.abort(); searches.clear(); project = null; selections.clear(); unavailablePlate('Apply the known project data'); $('filaments').replaceChildren(); invalidatePreview(); };
+$('manifest').oninput = () => { renderManifestColors(); sourceGeneration++; extractionController?.abort(); extracted = null; confirmedPlates.clear(); usageDrafts.clear(); usageViews.clear(); $('source-usage').hidden = true; for (const controller of searches) controller.abort(); searches.clear(); project = null; selections.clear(); unavailablePlate('Apply the known project data'); $('filaments').replaceChildren(); invalidatePreview(); };
 $('apply-manifest').onclick = applyProject;
 $('plate').onchange = renderFilaments;
 $('release-mode').onchange = invalidatePreview;
@@ -287,6 +342,7 @@ async function poll() {
     const receipt = order.plates[0];
     $('state').textContent = receipt.status; $('request-id').textContent = receipt.requestId ?? 'Awaiting receipt'; $('job-id').textContent = receipt.job?.id ?? '—';
     $('actions').textContent = JSON.stringify(receipt.requiredActions ?? [], null, 2); $('failure').textContent = receipt.error ? JSON.stringify(receipt.error, null, 2) : 'None'; $('error').textContent = '';
+    renderReportedColors($('actions-colors'), receipt.requiredActions); renderReportedColors($('failure-colors'), receipt.error);
     if (!controls(receipt)) timer = setTimeout(poll, 1000);
   } catch (error) { $('error').textContent = `${error.message}. Status is unknown. Polling will retry.`; timer = setTimeout(poll, 3000); }
 }

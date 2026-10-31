@@ -10,3 +10,6 @@ proof/filament-mapping/results.json
 proof/plate-extraction/*.png
 proof/plate-extraction/*.webm
 proof/plate-extraction/results.json
+proof/plate-colors/*.png
+proof/plate-colors/*.webm
+proof/plate-colors/results.json

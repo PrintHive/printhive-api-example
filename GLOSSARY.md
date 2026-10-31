@@ -15,3 +15,7 @@ A filament product recorded in Hive's catalog. Its name, brand and SKU describe 
 ## Target slot
 
 A physical filament route on the printer chosen to run the job. Smart Queue can determine this route when it chooses a printer and matches the job's requirements.
+
+## Saved slice usage
+
+A record of source filaments involved in a previous slicing of a plate. It can differ from the current project's filament usage.
