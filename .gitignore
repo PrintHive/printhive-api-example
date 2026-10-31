@@ -4,3 +4,6 @@ data/
 *.log
 !proof/*.log
 !proof/ui/*.log
+proof/filament-mapping/*.png
+proof/filament-mapping/*.webm
+proof/filament-mapping/results.json

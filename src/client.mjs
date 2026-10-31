@@ -1,4 +1,5 @@
 import { PrintHive } from "@printhive/api";
+import { createCatalog } from "./catalog.mjs";
 export function clientFromEnv() {
   const apiKey = process.env.PRINTHIVE_API_KEY;
   if (!apiKey) throw new Error("Set PRINTHIVE_API_KEY on the server");
@@ -34,5 +35,5 @@ export function clientFromEnv() {
       );
     return response.json();
   }
-  return { hive, control };
+  return { hive, control, catalog: createCatalog({ baseUrl, apiKey }) };
 }

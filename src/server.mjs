@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { validateCatalogQuery } from "./catalog.mjs";
+import { resolveMappedInput, validateMappedInput } from "./project-data.mjs";
 import { createServer } from "node:http";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -11,6 +14,7 @@ const publicDir = fileURLToPath(new URL("../public/", import.meta.url));
 const assets = new Map([
   ["/", ["index.html", "text/html; charset=utf-8"]],
   ["/app.js", ["app.js", "text/javascript; charset=utf-8"]],
+  ["/project-data.mjs", ["../src/project-data.mjs", "text/javascript; charset=utf-8"]],
   ["/style.css", ["style.css", "text/css; charset=utf-8"]],
 ]);
 
@@ -25,8 +29,8 @@ async function readBody(req, limit) {
   return Buffer.concat(chunks);
 }
 
-export function createOrderServer({ hive, control, directory = "data", designs = "fixtures", baseUrl = "https://api.printhiv3d.com" }) {
-  const orders = createOrders(hive, directory);
+export function createOrderServer({ hive, control, catalog, directory = "data", designs = "fixtures", baseUrl = "https://api.printhiv3d.com" }) {
+  const orders = createOrders(hive, directory, undefined, catalog);
   designs = resolve(designs);
   // Show the destination without URL credentials, query strings, or fragments.
   const target = new URL(baseUrl);
@@ -51,6 +55,26 @@ export function createOrderServer({ hive, control, directory = "data", designs =
         });
         return res.end(bytes);
       }
+      if (req.method === "GET" && pathname === "/catalog") {
+        if (!catalog) return reply(503, { error: "Hive catalog is unavailable" });
+        const search = new URL(req.url, "http://localhost").searchParams;
+        try { validateCatalogQuery(search); } catch (error) { return reply(400, { error: error.message }); }
+        try { return reply(200, await catalog.search(search)); }
+        catch { return reply(502, { error: "Hive catalog lookup failed. Retry the search or check the filament ID." }); }
+      }
+      if (req.method === "GET" && pathname === "/project-data") {
+        const bytes = await readFile(join(designs, "cube.3mf"));
+        return reply(200, { filename: "cube.3mf", sha256: createHash("sha256").update(bytes).digest("hex"), plates: [{ number: 1, filaments: [{ sourceSlot: 0, name: "Cube", material: "PETG", color: "#39FF14" }] }] });
+      }
+      if (req.method === "POST" && pathname === "/orders/preview") {
+        if (!catalog) return reply(503, { error: "Hive catalog is unavailable" });
+        const input = JSON.parse(await readBody(req, 65536));
+        validateMappedInput(input);
+        try {
+          const resolved = await resolveMappedInput(input, catalog);
+          return reply(200, { plate: input.plates[0], filaments: resolved.filaments });
+        } catch { return reply(400, { error: "A selected Hive filament cannot form a single-color requirement. Search again and choose a current catalog entry." }); }
+      }
       if (req.method === "GET" && pathname === "/config")
         return reply(200, { baseUrl: displayUrl, production, maxUploadBytes: MAX_UPLOAD_BYTES });
       if (req.method === "POST" && pathname === "/orders") {
@@ -65,7 +89,8 @@ export function createOrderServer({ hive, control, directory = "data", designs =
             return reply(400, { error: "Upload a nonempty .3mf file" });
           // Ignore browser paths and use a private temporary directory per upload.
           const filename = basename(file.name.replaceAll("\\", "/"));
-          validateOrder({ ...input, file: filename });
+          if (input?.projectData !== undefined || input?.mappings !== undefined) validateMappedInput(input);
+          else validateOrder({ ...input, file: filename });
           temporary = await mkdtemp(join(tmpdir(), "printhive-upload-"));
           const source = join(temporary, filename);
           await writeFile(source, Buffer.from(await file.arrayBuffer()), { mode: 0o600 });
@@ -79,6 +104,14 @@ export function createOrderServer({ hive, control, directory = "data", designs =
             return reply(400, { error: "File must be inside DESIGN_DIR" });
           input = { ...input, file };
         } else return reply(400, { error: "Use application/json or multipart/form-data" });
+        if (input?.projectData !== undefined || input?.mappings !== undefined) {
+          if (!catalog) return reply(503, { error: "Hive catalog is unavailable" });
+          validateMappedInput(input);
+          const bytes = await readFile(input.file);
+          const sha256 = createHash("sha256").update(bytes).digest("hex");
+          if (sha256 !== input.projectData.sha256.toLowerCase() || basename(input.file) !== input.projectData.filename)
+            return reply(400, { error: "Project data belongs to a different file; load the current Printie plate data" });
+        }
         const record = await orders.submit(input);
         return reply(202, {
           id: record.id,

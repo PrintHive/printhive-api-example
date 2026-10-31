@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PrintHive · Try a print order</title>
   <link rel="stylesheet" href="/style.css">
-  <script src="/app.js" defer></script>
+  <script src="/app.js" type="module"></script>
 </head>
 <body>
 <main>
@@ -15,16 +15,31 @@
   <div class="layout">
   <form id="order-form">
     <h2>Prepare your order</h2>
+    <fieldset id="intent-fields" class="intent-fields">
     <label for="file">Project 3MF</label>
     <input id="file" type="file" accept=".3mf">
     <p class="hint">Leave empty to use bundled cube.3mf. Upload limit: 16 MiB including form data.</p>
     <div class="pair">
-      <div><label for="plate">Plate number</label><input id="plate" type="number" min="1" step="1" value="1" required></div>
+      <div><label for="plate">Plate</label><select id="plate" required></select></div>
       <div><label for="release-mode">Release mode</label><select id="release-mode"><option value="manual">Manual · review first</option><option value="automatic">Auto · queue when ready</option></select></div>
     </div>
-    <fieldset><legend>Filament requirements</legend><div id="filaments"></div><button type="button" id="add-filament" class="secondary">Add filament</button></fieldset>
+    <details id="project-editor"><summary>Printie project data</summary>
+      <p class="hint">Printie supplies the filaments used by each plate after processing the project. Import that data here; this example does not infer painted material usage.</p>
+      <label for="manifest-file">Import project data JSON</label><input id="manifest-file" type="file" accept=".json,application/json">
+      <label for="manifest">Plate and source filament data</label><textarea id="manifest" rows="10" spellcheck="false"></textarea>
+      <button type="button" id="apply-manifest" class="secondary">Use project data</button>
+      <p id="project-error" role="alert"></p>
+    </details>
+    <p id="project-summary" class="hint" role="status">Loading Printie project data…</p>
+    <fieldset><legend>Map this plate’s source filaments</legend>
+      <p class="hint">Choose one Hive filament for every source filament. Hive currently matches material type and color; selecting a product does not require its exact SKU. Smart Queue chooses the physical slot.</p>
+      <div id="filaments"></div>
+    </fieldset>
     <label for="printer">Printer ID (optional)</label><input id="printer" type="text" placeholder="Leave empty for Smart Queue">
     <p class="hint">A created job may still wait for materials or printer readiness.</p>
+    </fieldset>
+    <button id="preview" type="button" class="secondary" disabled>Preview API request</button>
+    <pre id="payload" aria-label="API request preview">Choose a Hive requirement for every source filament.</pre>
     <button id="submit" type="submit" disabled>Submit order</button>
   </form>
   <section aria-labelledby="status-heading">
@@ -43,11 +58,4 @@
   </div>
   <footer>Your API key stays on this server. This page sends requests only to this server.</footer>
 </main>
-<template id="filament-template"><div class="filament">
-  <label>Source slot<input data-field="sourceSlot" type="number" min="0" step="1" value="0" required></label>
-  <label>Material<input data-field="material" value="PETG" required></label>
-  <label>Color<input data-field="color" type="color" value="#39ff14"></label>
-  <button type="button" class="secondary remove" aria-label="Remove filament">Remove</button>
-</div></template>
-</body>
 </html>

@@ -6,7 +6,7 @@ The CLI and HTTP backend share the same durable order store. Your API key stays 
 
 ## Current API limit
 
-Local verification found a timing defect: creation can fail with `model_file_not_ready` while its newly sliced output is still processing. Do not claim reliable production use until the API resolves that race. [The proof notes](proof/README.md) describe the evidence and verification conditions.
+The [original local proof notes](proof/README.md) record a processing race found during early verification. They are historical evidence, not a statement about the current production deployment. Source inspection can still hold a request for review; partner-supplied plate data does not approve those findings.
 
 ## Set up
 
@@ -84,7 +84,7 @@ Uploads use multipart `POST /orders` with an `order` JSON field and a `file` fie
 
 ![Manual request held for review against the local fake API](proof/ui/manual-held.png)
 
-For a credential-free browser check, run the [UI proof script](proof/ui/README.md). It starts an HTTP stub on loopback and sets a dummy key. It never calls production.
+The [original UI proof](proof/ui/README.md) is historical and uses a loopback stub. The running example uses the configured real API. Tests use local fixtures and do not submit production orders.
 
 ## Authorize or cancel a manual request
 
@@ -128,3 +128,39 @@ The sample uses only public print-job create, poll, release, and cancel routes. 
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Map Printie plate filaments to Hive requirements
+
+Printie is responsible for processing its project and identifying the source filaments used by each plate. This example consumes that known data. It does not decode painted triangles or infer which palette entries a plate uses.
+
+1. Choose a project 3MF. Changing the file clears the previous plate data and selections.
+2. Open **Printie project data**, then paste or import JSON in this shape:
+
+```json
+{
+  "plates": [
+    {
+      "number": 2,
+      "filaments": [
+        { "sourceSlot": 0, "name": "Body", "material": "PETG", "color": "#000000" },
+        { "sourceSlot": 3, "name": "Accent", "material": "PETG", "color": "#FFFFFF" }
+      ]
+    }
+  ]
+}
+```
+
+3. Click **Use project data**. The browser binds the manifest to the selected file's SHA-256; submission verifies those bytes again on the server. The supplied data must describe this file. The bundled cube has its own known plate data.
+4. Choose a plate. Its source slots retain their original zero-based indices. Plate switching keeps separate selections; it never renumbers slots or copies another plate's requirements.
+5. For every source filament, search the real Hive catalog by name, brand, SKU, or an exact Hive filament UUID. Explicitly choose a result. Use **More results** for the next page. Catalog presence does not establish printer compatibility or loaded inventory.
+6. Click **Preview API request** to resolve the selections and inspect the payload without creating a job. Submit only when you want to create an actual request.
+
+The public job API currently accepts `filaments: [{ sourceSlot, material, color, targetSlot? }]`. It does **not** accept material/filament IDs or SKUs in those rows. Selecting a catalog product resolves its material type and hex color into the supported fields. For a new order, the server resolves the ID before submission and keeps the catalog ID, name, and SKU in its durable order record. Unchanged retries reuse that saved catalog snapshot and the original idempotency key, even if the catalog is renamed or unavailable. Hive matches type and color; it does not require that exact product or SKU. A `PETG-CF` type stays `PETG-CF`, and missing or ambiguous colors cannot silently become a guessed color.
+
+The example sends no `targetSlot`. When no printer is specified, Smart Queue determines the physical material routing later. Explicit printer selection retains the same requirement payload and still undergoes Hive's qualification and readiness checks.
+
+SDK 0.2.0 has no catalog methods. The backend therefore uses a thin authenticated read-only adapter for `GET /v1/materials` and `GET /v1/materials/:id`. The browser talks only to the local `/catalog` proxy, which returns selected public catalog fields and never the API key. Search text is limited to 100 characters and paginated in pages of 20. The preview endpoint performs catalog reads only. Existing CLI callers can continue supplying typed filament requirements directly.
+
+The HTTP mapped-order form adds `projectData` and `mappings: [{ sourceSlot, materialId }]` alongside its existing single selected plate. The backend verifies complete mappings, binds the source filename and hash, resolves the selected catalog entries, then calls the SDK with only the supported fields. Original source metadata and chosen catalog records remain part of immutable order intent, so a changed mapping conflicts with the same order ID.
+
+Source knowledge does not bypass inspection. An API hold such as `custom_instructions` or `material_usage_unresolved` remains a hold until Hive supports or completes the required review.

@@ -1,0 +1,55 @@
+{
+  "plates": [
+    {
+      "number": 1,
+      "filaments": [
+        {
+          "sourceSlot": 0,
+          "name": "Body",
+          "material": "PETG",
+          "color": "#C12E1F"
+        },
+        {
+          "sourceSlot": 1,
+          "name": "Accent",
+          "material": "PETG",
+          "color": "#2E6FC1"
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "filaments": [
+        {
+          "sourceSlot": 1,
+          "name": "Accent",
+          "material": "PETG",
+          "color": "#2E6FC1"
+        },
+        {
+          "sourceSlot": 2,
+          "name": "Trim",
+          "material": "PETG",
+          "color": "#F2F2F2"
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "filaments": [
+        {
+          "sourceSlot": 0,
+          "name": "Body",
+          "material": "PETG",
+          "color": "#C12E1F"
+        },
+        {
+          "sourceSlot": 2,
+          "name": "Trim",
+          "material": "PETG",
+          "color": "#F2F2F2"
+        }
+      ]
+    }
+  ]
+}

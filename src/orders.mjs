@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, open, rename } from "node:fs/promises";
 import { join, basename } from "node:path";
 import { PrintJobCreateStoppedError } from "@printhive/api";
+import { resolveMappedInput, validateMappedInput } from "./project-data.mjs";
 
 export function validateOrder(order) {
   if (
@@ -14,11 +15,13 @@ export function validateOrder(order) {
     !order.plates.every((p) => Number.isInteger(p) && p > 0) ||
     !Array.isArray(order.filaments) ||
     !order.filaments.length ||
+    new Set(order.filaments.map((f) => f?.sourceSlot)).size !== order.filaments.length ||
     !order.filaments.every(
       (f) =>
         f &&
         Number.isInteger(f.sourceSlot) &&
         f.sourceSlot >= 0 &&
+        f.sourceSlot <= 255 &&
         typeof f.material === "string" &&
         f.material.length > 0 &&
         /^#[a-fA-F0-9]{6}$/.test(f.color),
@@ -37,7 +40,7 @@ export function validateOrder(order) {
 
 // One process owns this directory. Calls serialize, including concurrent HTTP retries.
 // Each immutable intent includes a private copy of the source bytes.
-export function createOrders(hive, directory = "data", onReceipt = () => {}) {
+export function createOrders(hive, directory = "data", onReceipt = () => {}, catalog) {
   let queue = Promise.resolve();
   const path = (id) => {
     if (!/^[a-zA-Z0-9_-]{1,80}$/.test(id)) throw new Error("Invalid order id");
@@ -65,13 +68,36 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}) {
     }
   }
   async function submit(input) {
+    const mapped = input?.projectData !== undefined || input?.mappings !== undefined;
+    if (mapped) validateMappedInput(input);
+    else validateOrder(input);
+    const bytes = await readFile(input.file);
+    if (mapped) {
+      const { projectData, mappings } = validateMappedInput(input);
+      if (createHash("sha256").update(bytes).digest("hex") !== projectData.sha256 || basename(input.file) !== projectData.filename)
+        throw new Error("Project data belongs to a different file");
+      let saved;
+      try { saved = await load(input.id); }
+      catch (error) { if (error.code !== "ENOENT") throw error; }
+      if (saved) {
+        const sort = (entries) => entries.sort(([left], [right]) => left - right);
+        const retained = saved.intent.catalogSelections?.map(({ sourceSlot, id }) => [sourceSlot, id.toLowerCase()]);
+        const requested = [...mappings].map(([slot, id]) => [slot, id.toLowerCase()]);
+        if (!retained || JSON.stringify(sort(retained)) !== JSON.stringify(sort(requested)))
+          throw new Error("Order id conflicts with stored intent");
+        input = { ...input, projectData, filaments: saved.intent.filaments, catalogSelections: saved.intent.catalogSelections };
+      } else {
+        if (!catalog) throw new Error("Hive catalog is unavailable");
+        input = await resolveMappedInput(input, catalog);
+      }
+    }
     const order = validateOrder(input);
-    const bytes = await readFile(order.file);
     const intent = {
       filename: basename(order.file),
       sha256: createHash("sha256").update(bytes).digest("hex"),
       plates: order.plates,
       filaments: order.filaments,
+      ...(order.projectData ? { projectData: order.projectData, catalogSelections: order.catalogSelections } : {}),
       release: order.release ?? "automatic",
       ...(order.printer_id ? { printer_id: order.printer_id } : {}),
     };

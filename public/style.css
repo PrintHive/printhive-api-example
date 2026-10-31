@@ -29,3 +29,22 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; backgrou
 @media (max-width: 740px) { main { padding: 24px 16px; } .layout { grid-template-columns: 1fr; } form, section { padding: 18px; } }
 
 #submit { background: #39ff14; color: #0a0a0a; border-color: #0a0a0a; }
+textarea { font: .82rem/1.4 monospace; width: 100%; min-width: 0; padding: 10px; margin: 6px 0 14px; border: 1px solid #848c8c; border-radius: 4px; resize: vertical; }
+details { border: 1px solid #b2b8b8; padding: 12px; margin-bottom: 16px; border-radius: 4px; }
+summary { cursor: pointer; font-weight: 600; }
+.mapping { padding: 12px 0 20px; border-bottom: 1px solid #b2b8b8; margin-bottom: 12px; }
+.mapping:last-child { border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
+.mapping h3 { margin-top: 0; }
+.source-line { display: flex; gap: 8px; align-items: center; font-size: .85rem; }
+.swatch { display: inline-block; width: 20px; height: 20px; border: 1px solid #848c8c; flex-shrink: 0; }
+.selection { font-size: .82rem; overflow-wrap: anywhere; padding: 8px; background: #f0eee9; }
+.catalog-results { display: grid; gap: 8px; max-height: 330px; overflow-y: auto; margin-bottom: 12px; }
+.catalog-item { display: grid; gap: 4px; padding: 10px; border: 1px solid #b2b8b8; border-radius: 4px; font-size: .8rem; overflow-wrap: anywhere; }
+.catalog-item code { font-size: .7rem; }
+.catalog-item button { justify-self: start; font-size: .8rem; }
+.catalog-item button[aria-pressed=true] { background: #222525; color: white; }
+#project-error { color: #a32620; font-size: .85rem; }
+#payload { max-height: 300px; overflow-y: auto; }
+@media (max-width: 430px) { .pair { flex-wrap: wrap; } .pair > div { flex-basis: 100%; } }
+
+.intent-fields { border: 0; margin: 0; padding: 0; }

@@ -1,35 +1,200 @@
+import { validateProjectData, validateMappedInput } from '/project-data.mjs';
 const $ = (id) => document.getElementById(id);
 let active;
 let timer;
 let busy = false;
 let ready = false;
-
+let bundled;
+let project;
+let sourceGeneration = 0;
+let previewGeneration = 0;
+const selections = new Map();
+const searches = new Set();
+const template = { plates: [{ number: 1, filaments: [{ sourceSlot: 0, name: 'Body', material: 'PETG', color: '#000000' }] }] };
 async function api(path, options) {
   const response = await fetch(path, options);
   const data = await response.json();
   if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`);
   return data;
 }
-function addFilament() {
-  const row = $('filament-template').content.firstElementChild.cloneNode(true);
-  row.querySelector('[data-field=sourceSlot]').value = $('filaments').children.length;
-  row.querySelector('button').onclick = () => {
-    row.remove();
-    updateRemoveButtons();
-  };
+function element(tag, text, className) {
+  const node = document.createElement(tag);
+  if (text !== undefined) node.textContent = text;
+  if (className) node.className = className;
+  return node;
+}
+function plate() { return project?.plates.find((p) => p.number === Number($('plate').value)); }
+function chosen() {
+  const number = Number($('plate').value);
+  if (!selections.has(number)) selections.set(number, new Map());
+  return selections.get(number);
+}
+function invalidatePreview() {
+  previewGeneration++;
+  $('payload').textContent = 'Choose a Hive requirement for every source filament, then preview the API request.';
+  updateButtons();
+}
+function complete() { return plate() && plate().filaments.every((f) => chosen().has(f.sourceSlot)); }
+function updateButtons() {
+  $('submit').disabled = busy || !ready || (!active && !complete());
+  $('preview').disabled = busy || Boolean(active) || !ready || !complete();
+  $('intent-fields').disabled = busy || Boolean(active);
+}
+function resetProject() {
+  sourceGeneration++;
+  for (const controller of searches) controller.abort();
+  searches.clear();
+  project = null;
+  selections.clear();
+  $('plate').replaceChildren();
+  $('filaments').replaceChildren();
+  $('project-summary').textContent = 'Load Printie’s plate data for this file before mapping filaments.';
+  $('manifest').value = JSON.stringify(template, null, 2);
+  $('project-editor').open = true;
+  $('project-error').textContent = '';
+  invalidatePreview();
+}
+function showProject(value) {
+  project = value;
+  $('plate').replaceChildren(...value.plates.map((p) => {
+    const option = element('option', `Plate ${p.number}`); option.value = p.number; return option;
+  }));
+  $('project-summary').textContent = `${value.filename} · Printie data for ${value.plates.length} plate${value.plates.length === 1 ? '' : 's'}`;
+  $('project-error').textContent = '';
+  $('project-editor').open = false;
+  renderFilaments();
+}
+async function applyProject() {
+  const generation = ++sourceGeneration;
+  try {
+    const data = validateProjectData(JSON.parse($('manifest').value));
+    const file = $('file').files[0];
+    if (file && file.size > 16 * 1024 * 1024 - 65536) throw new Error('Choose a 3MF smaller than 16 MiB including form data');
+    const sha256 = file ? [...new Uint8Array(await crypto.subtle.digest('SHA-256', await file.arrayBuffer()))].map((b) => b.toString(16).padStart(2, '0')).join('') : bundled.sha256;
+    if (generation !== sourceGeneration) return;
+    selections.clear();
+    for (const controller of searches) controller.abort();
+    searches.clear();
+    showProject({ filename: file?.name ?? bundled.filename, sha256, ...data });
+  } catch (error) {
+    if (generation !== sourceGeneration) return;
+    project = null; selections.clear(); $('filaments').replaceChildren(); $('plate').replaceChildren();
+    $('project-error').textContent = error.message;
+    $('project-summary').textContent = 'Project data is not ready.';
+    invalidatePreview();
+  }
+}
+function renderFilaments() {
+  for (const controller of searches) controller.abort();
+  searches.clear();
+  $('filaments').replaceChildren();
+  const selectedPlate = plate();
+  if (!selectedPlate) return;
+  for (const source of selectedPlate.filaments) renderFilament(source, selectedPlate.number);
+  invalidatePreview();
+}
+function renderFilament(source, plateNumber) {
+  const row = element('div', undefined, 'mapping');
+  row.dataset.sourceSlot = source.sourceSlot;
+  const heading = element('h3', `${source.name ?? 'Project filament'} · source slot ${source.sourceSlot}`);
+  const sourceLine = element('p', `Source: ${source.material} · ${source.color}`, 'source-line');
+  const swatch = element('span', undefined, 'swatch'); swatch.style.backgroundColor = source.color; swatch.setAttribute('aria-hidden', 'true'); sourceLine.prepend(swatch);
+  const selected = element('p', undefined, 'selection');
+  function showSelection() {
+    const value = selections.get(plateNumber)?.get(source.sourceSlot);
+    selected.textContent = value ? `Requirement: ${value.brand ?? ''} ${value.name} · ${value.materialType} · ${value.color}${value.sku ? ` · SKU ${value.sku}` : ''} · ID ${value.id}` : 'No Hive requirement selected';
+  }
+  showSelection();
+  const label = element('label', 'Find a Hive filament by name, SKU, or ID');
+  const input = element('input'); input.type = 'search'; input.maxLength = 100; input.value = source.material; input.id = `search-${plateNumber}-${source.sourceSlot}`; label.htmlFor = input.id;
+  const search = element('button', 'Search', 'secondary'); search.type = 'button';
+  const status = element('p', '', 'hint'); status.setAttribute('role', 'status');
+  const results = element('div', undefined, 'catalog-results');
+  const navigation = element('div', undefined, 'pair');
+  const previous = element('button', 'Previous', 'secondary'); previous.type = 'button';
+  const next = element('button', 'More results', 'secondary'); next.type = 'button';
+  navigation.append(previous, next); navigation.hidden = true;
+  let requestVersion = 0;
+  let controller;
+  let offset = 0;
+  let query = '';
+  async function find(newOffset = 0) {
+    const version = ++requestVersion;
+    controller?.abort();
+    controller = new AbortController(); searches.add(controller);
+    const own = controller;
+    offset = newOffset;
+    query = input.value.trim();
+    status.textContent = 'Searching Hive’s catalog…'; results.replaceChildren(); navigation.hidden = true;
+    try {
+      const data = await api(`/catalog?${new URLSearchParams({ q: query, offset: String(offset) })}`, { signal: controller.signal });
+      if (version !== requestVersion || !row.isConnected || Number($('plate').value) !== plateNumber) return;
+      status.textContent = data.materials.length ? `${data.total} results · showing ${data.offset + 1}–${data.offset + data.materials.length}` : 'No matching catalog filaments. Try a name, SKU, or ID.';
+      for (const item of data.materials) {
+        const card = element('div', undefined, 'catalog-item');
+        card.append(element('strong', `${item.brand ?? ''} ${item.name}`.trim()), element('span', `${item.materialType || 'Unknown material'} · ${item.color ?? 'No single hex color'}${item.sku ? ` · SKU ${item.sku}` : ''}`), element('code', item.id));
+        const use = element('button', `Use ${item.name}`, 'secondary'); use.type = 'button'; use.disabled = !item.selectable;
+        use.onclick = () => {
+          chosen().set(source.sourceSlot, item); showSelection(); invalidatePreview();
+          for (const button of results.querySelectorAll('button')) button.setAttribute('aria-pressed', String(button === use));
+        };
+        use.setAttribute('aria-pressed', String(chosen().get(source.sourceSlot)?.id === item.id));
+        card.append(use);
+        if (!item.selectable) card.append(element('span', item.unavailableReason, 'hint'));
+        results.append(card);
+      }
+      previous.disabled = data.offset === 0; next.disabled = !data.hasMore;
+      navigation.hidden = data.total <= 20;
+    } catch (error) {
+      if (own.signal.aborted || version !== requestVersion) return;
+      status.textContent = error.message;
+    } finally { searches.delete(own); }
+  }
+  input.oninput = () => { requestVersion++; controller?.abort(); results.replaceChildren(); navigation.hidden = true; status.textContent = 'Press Search to find catalog filaments.'; };
+  input.onkeydown = (event) => { if (event.key === 'Enter') { event.preventDefault(); find(); } };
+  search.onclick = () => find(); previous.onclick = () => find(Math.max(0, offset - 20)); next.onclick = () => find(offset + 20);
+  row.append(heading, sourceLine, selected, label, input, search, status, results, navigation);
   $('filaments').append(row);
-  updateRemoveButtons();
+  find();
 }
-function updateRemoveButtons() {
-  for (const button of $('filaments').querySelectorAll('button'))
-    button.disabled = $('filaments').children.length === 1;
+function currentInput() {
+  const input = {
+    id: `browser-${crypto.randomUUID()}`, plates: [Number($('plate').value)], projectData: project,
+    mappings: plate().filaments.map((f) => ({ sourceSlot: f.sourceSlot, materialId: chosen().get(f.sourceSlot)?.id })),
+    release: $('release-mode').value,
+    ...($('printer').value.trim() ? { printer_id: $('printer').value.trim() } : {}),
+  };
+  validateMappedInput(input);
+  return input;
 }
+$('preview').onclick = async () => {
+  const version = ++previewGeneration;
+  $('payload').textContent = 'Resolving selected catalog requirements…';
+  try {
+    const input = currentInput();
+    const resolved = await api('/orders/preview', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) });
+    if (version !== previewGeneration) return;
+    $('payload').textContent = JSON.stringify({ ...resolved, release: input.release, ...(input.printer_id ? { printer_id: input.printer_id } : {}) }, null, 2);
+  } catch (error) { if (version === previewGeneration) $('payload').textContent = error.message; }
+};
+$('file').onchange = () => { resetProject(); if (!$('file').files.length && bundled) { $('manifest').value = JSON.stringify({ plates: bundled.plates }, null, 2); applyProject(); } };
+$('manifest-file').onchange = async () => {
+  const file = $('manifest-file').files[0];
+  if (!file) return;
+  const generation = sourceGeneration;
+  try { if (file.size > 65536) throw new Error('Project data JSON must be smaller than 64 KiB'); const text = await file.text(); if (generation !== sourceGeneration) return; $('manifest').value = text; await applyProject(); }
+  catch (error) { $('project-error').textContent = error.message; }
+};
+$('manifest').oninput = () => { sourceGeneration++; for (const controller of searches) controller.abort(); searches.clear(); project = null; selections.clear(); $('plate').replaceChildren(); $('filaments').replaceChildren(); invalidatePreview(); };
+$('apply-manifest').onclick = applyProject;
+$('plate').onchange = renderFilaments;
+$('release-mode').onchange = invalidatePreview;
+$('printer').oninput = invalidatePreview;
 function controls(receipt) {
   const terminal = ['created', 'failed', 'cancelled'].includes(receipt.status);
   $('release').hidden = !(receipt.status === 'held' && receipt.requiredActions?.some((a) => a.code === 'manual_release_required'));
   $('cancel').hidden = terminal;
-  $('release').disabled = busy;
-  $('cancel').disabled = busy;
+  $('release').disabled = busy; $('cancel').disabled = busy;
   return terminal;
 }
 async function poll() {
@@ -38,97 +203,41 @@ async function poll() {
   try {
     const order = await api(`/orders/${encodeURIComponent(active.id)}`);
     const receipt = order.plates[0];
-    $('state').textContent = receipt.status;
-    $('request-id').textContent = receipt.requestId ?? 'Awaiting receipt';
-    $('job-id').textContent = receipt.job?.id ?? '—';
-    $('actions').textContent = JSON.stringify(receipt.requiredActions ?? [], null, 2);
-    $('failure').textContent = receipt.error ? JSON.stringify(receipt.error, null, 2) : 'None';
-    $('error').textContent = '';
+    $('state').textContent = receipt.status; $('request-id').textContent = receipt.requestId ?? 'Awaiting receipt'; $('job-id').textContent = receipt.job?.id ?? '—';
+    $('actions').textContent = JSON.stringify(receipt.requiredActions ?? [], null, 2); $('failure').textContent = receipt.error ? JSON.stringify(receipt.error, null, 2) : 'None'; $('error').textContent = '';
     if (!controls(receipt)) timer = setTimeout(poll, 1000);
-  } catch (error) {
-    $('error').textContent = `${error.message}. Status is unknown. Polling will retry.`;
-    timer = setTimeout(poll, 3000);
-  }
+  } catch (error) { $('error').textContent = `${error.message}. Status is unknown. Polling will retry.`; timer = setTimeout(poll, 3000); }
 }
-$('add-filament').onclick = addFilament;
-addFilament();
 $('order-form').onsubmit = async (event) => {
-  event.preventDefault();
-  if (busy || !ready) return;
-  busy = true;
-  $('submit').disabled = true;
-  clearTimeout(timer);
-  $('error').textContent = '';
-  // Retain the same ID on an uncertain submission, so Retry cannot create a duplicate.
-  if (!active) {
-    const input = {
-      id: `browser-${crypto.randomUUID()}`,
-      plates: [Number($('plate').value)],
-      filaments: [...$('filaments').children].map((row) => ({
-        sourceSlot: Number(row.querySelector('[data-field=sourceSlot]').value),
-        material: row.querySelector('[data-field=material]').value.trim(),
-        color: row.querySelector('[data-field=color]').value,
-      })),
-      release: $('release-mode').value,
-      ...($('printer').value.trim() ? { printer_id: $('printer').value.trim() } : {}),
-    };
-    const file = $('file').files[0];
-    if (file && file.size > 16 * 1024 * 1024 - 65536) {
-      $('error').textContent = 'File too large. Choose a 3MF smaller than 16 MiB including form data.';
-      busy = false;
-      $('submit').disabled = false;
-      return;
-    }
-    let options;
-    if (file) {
-      const body = new FormData();
-      body.set('order', JSON.stringify(input));
-      body.set('file', file);
-      options = { method: 'POST', body };
-    } else options = { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...input, file: 'cube.3mf' }) };
-    active = { id: input.id, plate: input.plates[0], options };
-  }
+  event.preventDefault(); if (busy || !ready) return;
+  busy = true; updateButtons(); clearTimeout(timer); $('error').textContent = '';
   try {
-    const accepted = await api('/orders', active.options);
-    $('empty').hidden = true;
-    $('receipt').hidden = false;
-    $('order-id').textContent = accepted.id;
-    $('request-id').textContent = accepted.requests[0].requestId;
-    await poll();
-    active.options = null;
-    $('submit').textContent = 'Start another order';
-    // Starting another order is explicit; the current one keeps polling until then.
-    $('submit').type = 'button';
-    $('submit').onclick = () => location.reload();
-  } catch (error) {
-    $('error').textContent = `${error.message}. Retry preserves this order ID. To change the input, reload the page.`;
-    $('submit').textContent = 'Retry same order';
-  } finally {
-    busy = false;
-    $('submit').disabled = false;
-  }
-};
-for (const action of ['release', 'cancel']) {
-  $(action).onclick = async () => {
-    if (busy) return;
-    busy = true;
-    $('release').disabled = $('cancel').disabled = true;
-    clearTimeout(timer);
-    let actionError;
-    try {
-      await api(`/orders/${encodeURIComponent(active.id)}/${active.plate}/${action}`, { method: 'POST' });
-    } catch (error) {
-      actionError = `${error.message}. Status refreshed; check it before retrying this action.`;
-    } finally {
-      busy = false;
-      await poll();
-      if (actionError) $('error').textContent = actionError;
+    if (!active) {
+      const input = currentInput(); const file = $('file').files[0];
+      let options;
+      if (file) { const body = new FormData(); body.set('order', JSON.stringify(input)); body.set('file', file); options = { method: 'POST', body }; }
+      else options = { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...input, file: 'cube.3mf' }) };
+      active = { id: input.id, plate: input.plates[0], options };
+      updateButtons();
     }
-  };
-}
+    const accepted = await api('/orders', active.options);
+    $('empty').hidden = true; $('receipt').hidden = false; $('order-id').textContent = accepted.id; $('request-id').textContent = accepted.requests[0].requestId;
+    await poll(); active.options = null; $('submit').textContent = 'Start another order'; $('submit').type = 'button'; $('submit').onclick = () => location.reload();
+  } catch (error) { $('error').textContent = active ? `${error.message}. Retry preserves this order ID. To change input, reload the page.` : error.message; $('submit').textContent = active ? 'Retry same order' : 'Submit order'; }
+  finally { busy = false; updateButtons(); }
+};
+for (const action of ['release', 'cancel']) $(action).onclick = async () => {
+  if (busy) return;
+  busy = true; $('release').disabled = $('cancel').disabled = true; clearTimeout(timer);
+  let actionError;
+  try { await api(`/orders/${encodeURIComponent(active.id)}/${active.plate}/${action}`, { method: 'POST' }); }
+  catch (error) { actionError = `${error.message}. Status refreshed; check before retrying this action.`; }
+  finally { busy = false; await poll(); if (actionError) $('error').textContent = actionError; updateButtons(); }
+};
 $('refresh').onclick = poll;
-api('/config').then((config) => {
+Promise.all([api('/config'), api('/project-data')]).then(([config, data]) => {
   $('target').textContent = `API destination: ${config.baseUrl}${config.production ? ' · Production' : ' · Custom API'}`;
-  ready = true;
-  $('submit').disabled = false;
-}).catch(() => { $('target').textContent = 'Cannot load API destination. Reload before submitting.'; });
+  bundled = data; ready = true;
+  if (!$('file').files.length && !project) { $('manifest').value = JSON.stringify({ plates: data.plates }, null, 2); showProject(data); }
+  updateButtons();
+}).catch((error) => { $('target').textContent = 'Cannot load API destination and project data. Reload before submitting.'; $('error').textContent = error.message; });

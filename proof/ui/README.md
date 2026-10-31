@@ -1,3 +1,5 @@
+> Historical capture of the original UI. The mapping UI has since changed; this script and its artifacts do not verify the current selectors or production catalog flow.
+
 # Browser proof against a fake API
 
 This proof exercises the example server and the installed `@printhive/api` SDK against a loopback HTTP stub. The stub implements job creation, polling, release, and cancellation. It accepts only a dummy key. No production API or printer is involved.
