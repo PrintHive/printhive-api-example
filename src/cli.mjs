@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { clientFromEnv } from "./client.mjs";
 import { createOrders, waitForJob } from "./orders.mjs";
+import { readCreatedJob } from "./job-status.mjs";
 try {
   const [command, value] = process.argv.slice(2);
   if (!command)
@@ -24,6 +25,7 @@ try {
     for (const item of record.plates) {
       const receipt = await waitForJob(hive, item.requestId);
       console.log(JSON.stringify(receipt, null, 2));
+      if (receipt.status === "created") console.log(JSON.stringify(await readCreatedJob(hive, receipt), null, 2));
       if (receipt.status !== "created") process.exitCode = 2;
     }
   }

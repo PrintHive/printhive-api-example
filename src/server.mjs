@@ -20,6 +20,7 @@ const assets = new Map([
   ["/catalog-sync.js", ["catalog-sync.js", "text/javascript; charset=utf-8"]],
   ["/colors.mjs", ["colors.mjs", "text/javascript; charset=utf-8"]],
   ["/project-data.mjs", ["../src/project-data.mjs", "text/javascript; charset=utf-8"]],
+  ["/job-status.mjs", ["../src/job-status.mjs", "text/javascript; charset=utf-8"]],
   ["/style.css", ["style.css", "text/css; charset=utf-8"]],
 ]);
 
@@ -164,8 +165,8 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
       }
       reply(404, { error: "Not found" });
     } catch (error) {
-      reply(error.code === "ENOENT" ? 404 : error.status === 413 ? 413 : 400, {
-        error: error.status === 413 ? "Request too large" : "Order operation failed; check input or read status before retrying",
+      reply(error.code === "ENOENT" ? 404 : error.status === 413 ? 413 : error.status === 422 ? 422 : 400, {
+        error: error.status === 413 ? "Request too large" : error.status === 422 ? "Hive rejected this request; no job was accepted. Review the API code and request status before changing or retrying." : "Order operation failed; check input or read status before retrying",
         code: error.code,
         upstreamStatus: error.status,
       });

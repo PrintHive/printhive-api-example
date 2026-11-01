@@ -78,7 +78,7 @@ With `PRINTHIVE_API_KEY` set privately on the server, run `npm start` and open <
 4. Select the release mode and click **Submit order**.
 5. Follow the request ID and live status. For a manual hold, review **Required actions**, then click **Release**. Click **Cancel** to stop a request before job creation.
 
-The page polls once per second until `created`, `failed`, or `cancelled`. A held request keeps polling. A created receipt shows its job ID when the job still exists. Network errors leave the outcome unknown, and polling retries. If submission fails, **Retry same order** keeps the original ID and input to avoid a duplicate. Reload to change that input. **Start another order** clears the page without cancelling the previous order.
+The page polls the create request once per second until `created`, `failed`, or `cancelled`. A held request keeps polling. After creation, it reads the live job until a terminal job state or an unavailable job ends that follow-up. A created receipt shows its job ID when the job still exists. Network errors leave the outcome unknown, and polling retries. If submission fails, **Retry same order** keeps the original ID and input to avoid a duplicate. Reload to change that input. **Start another order** clears the page without cancelling the previous order.
 
 Uploads use multipart `POST /orders` with an `order` JSON field and a `file` field. The server limits the entire request to 16 MiB, copies the source into the durable order store, and removes its temporary upload directory. JSON requests keep the existing 64 KiB limit. The browser uses only this server's routes and never receives the API key. `GET /config` returns the destination without URL credentials, query strings, or fragments.
 
@@ -123,7 +123,29 @@ The tests also cover multipart uploads, request size limits, malformed input, st
 
 `proof/run.mjs` drives this application against an already provisioned, owned local Hive API with mock printers. Set `PRINTHIVE_BASE_URL`, `PRINTHIVE_API_KEY`, and `MOCK_PRINTER_ID` privately, then run `npm run proof`. It rejects remote APIs. Provisioning the Hive stack and slicing engine is outside this public sample. Never point the proof runner at real printers. The proof transcript in `proof/local-e2e.log` records only selected response fields and no credentials.
 
-The sample uses only public print-job create, poll, release, and cancel routes. It does not depend on partner source or preparation endpoints.
+The print-order flow uses public print-job create, create-request polling, job reads, release, and cancel routes. It does not depend on partner source or preparation endpoints.
+
+## Follow a named-printer job through filament waiting
+
+See the [SDK adoption audit](docs/sdk-upgrade.md) and [isolated end-to-end test plan](docs/e2e-plan.md) for the release requirements, pending waiting-reason contract and mock-printer acceptance cases.
+
+Choose a 3MF, select one plate, confirm its source filaments and select their Hive material requirements. Enter the isolated mock printer's UUID under **Printer ID**. The sample sends the file and that selected plate through `hive.printJobs.create` to `POST /v1/print-jobs/create`, with typed `filaments`, `printer_id`, `release` and `on_filament_mismatch` fields.
+
+**Wait** is the default mismatch policy. Once slicing and output processing allow admission, Hive can create a job that waits for filament. **Reject** sends `on_filament_mismatch: "reject"`; a mismatch refuses admission with HTTP 422. With manual release, first review and release the request before evaluating the final admission result. Preparation holds remain distinct from filament waiting on an existing job.
+
+The sample first polls `hive.printJobs.getCreateRequest`. A `created` receipt identifies the resulting job, whose current state is then read through `hive.printJobs.get`, calling `GET /v1/print-jobs/{id}`. The UI keeps the create-request status separate from job status and continues polling the job while it is active. Creation is not proof that materials match or the printer is ready. A deleted job retains its original receipt; a temporary job-read failure says status is unknown and does not submit a new job.
+
+The job panel renders API-reported `filament_waiting_reasons` with material, color swatches, Source Slot and any supplied `suggestedTargetSlot`. Source Slots are project indices. They are never converted into printer tray indices or assigned by a filtered reason's position. A physical location is shown only when the API supplies it, labeled as API AMS/slot indices. Otherwise the UI explicitly says placement remains unresolved.
+
+For a named mock printer, expand **Optional placement on a named printer** on a source filament and enter both API AMS ID and API slot ID. These optional indices become that filament's `targetSlot` in the preview, durable intent and request. They do not come from its Source Slot. Leave both fields empty for Hive to resolve placement; clearing the printer removes hints from the outgoing request. API AMS IDs 254 and 255 accept only slot 0. Changing a pinned hint requires a new order ID.
+
+The finalized unmet-only reason list and additive cause field are pending a separate API change. The reason presentation is isolated so that contract can be adopted without rewriting order persistence. Current API reason lists may include requirements that already match; this sample does not guess which entries to remove.
+
+`on_filament_mismatch` belongs to immutable order intent. Replaying a saved order retains its policy, source bytes, catalog selections and idempotency key. Changing the policy under the same order ID conflicts. Historical orders without a stored policy retain their original omitted field, whose API default is wait.
+
+The npm dependency remains 0.2.0 until a new release is approved. Install a locally packed SDK build containing `printJobs.get` for complete job following. The configuration response reports that method's availability. An older SDK shows an explicit unavailable message instead of silently adding another HTTP client.
+
+All automated job writes and claim checks must use the owned isolated API, real database and Cloud Slice with mock printers. The live sample's configured production API is not a writable test fixture. Production may return `plate_selection_host_update_required` until its Host supports plate selection; the sample displays that admission result rather than bypassing it.
 
 ## License
 
@@ -245,8 +267,12 @@ Local routes:
 - `GET /catalog-sync/list?externalId=…&sku=…&limit=20&offset=0`: reads synced organization catalog entries through the SDK.
 - `GET /catalog-sync/filaments/{id}`: reads one synced binding through the SDK.
 
-After sync, copy the product’s SKU or Hive UUID into the existing source-filament requirement chooser. The example does not guess which source slot gets that product. Print orders still send only the supported `{ sourceSlot, material, color, targetSlot? }` fields, and this UI continues to omit `targetSlot`. Exact product/SKU enforcement is separate API work; syncing a catalog identity does not add that guarantee to a job.
+After sync, copy the product’s SKU or Hive UUID into the existing source-filament requirement chooser. The example does not guess which source slot gets that product. Print orders send only the supported `{ sourceSlot, material, color, targetSlot? }` fields. `targetSlot` is omitted unless the user explicitly supplies a placement hint for a named printer. Exact product/SKU enforcement is separate API work; syncing a catalog identity does not add that guarantee to a job.
 
 Automated verification uses injected SDK fixtures and read-only production catalog checks. It must not click Sync or submit orders against production merely to verify the UI.
 
 See [catalog sync verification](proof/catalog-sync/README.md) for the real SDK contract checks, production read results, desktop and phone demos, and remaining proof limits.
+
+A denied live job read stops automatic job polling. The existing create-receipt error path still retries on denied access; revoke/reload behavior there remains a follow-up.
+
+See [job-flow verification](docs/job-flow-verification.md) for local test results, labeled UI demos and the remaining real-stack and waiting-reason contract work.

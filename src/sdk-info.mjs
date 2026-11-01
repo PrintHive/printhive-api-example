@@ -16,5 +16,5 @@ export function sdkInfo(hive, markerPath = resolve('data/sdk-local.json')) {
   const version = loadedPackageVersion;
   let source = 'installed-package';
   try { const marker = JSON.parse(readFileSync(markerPath, 'utf8')); if (marker.version === version && marker.kind === 'local-sdk-package') source = 'local-package'; } catch { /* A normal registry install has no local build marker. */ }
-  return { version, source, capabilities: { filamentCatalog: hasCatalogSync(hive) } };
+  return { version, source, capabilities: { filamentCatalog: hasCatalogSync(hive), printJobRead: typeof hive?.printJobs?.get === 'function' } };
 }

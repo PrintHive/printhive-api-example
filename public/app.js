@@ -1,5 +1,6 @@
 import { colorLabel } from '/colors.mjs';
 import { validateProjectData, validateMappedInput, normalizeColor } from '/project-data.mjs';
+import { waitingFilamentInstructions, shouldPollJob } from '/job-status.mjs';
 const $ = (id) => document.getElementById(id);
 let active;
 let timer;
@@ -15,12 +16,13 @@ const usageViews = new Map();
 let sourceGeneration = 0;
 let previewGeneration = 0;
 const selections = new Map();
+const placementHints = new Map();
 const searches = new Set();
 const template = { plates: [{ number: 1, filaments: [{ sourceSlot: 0, name: 'Body', material: 'PETG', color: '#000000' }] }] };
 async function api(path, options) {
   const response = await fetch(path, options);
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error ?? `HTTP ${response.status}`);
+  if (!response.ok) throw new Error(`${data.error ?? 'Request failed'}${data.code ? ` (${data.code})` : ''} · HTTP ${response.status}`);
   return data;
 }
 function element(tag, text, className) {
@@ -76,6 +78,7 @@ function resetProject() {
   searches.clear();
   project = null;
   selections.clear();
+  placementHints.clear();
   unavailablePlate('Reading project…');
   $('filaments').replaceChildren();
   $('project-summary').textContent = 'Reading plates and filament palette from the selected 3MF…';
@@ -90,6 +93,7 @@ function showProject(value) {
   extracted = null; confirmedPlates.clear(); usageDrafts.clear(); usageViews.clear();
   $('source-usage').hidden = true; $('extraction-error').textContent = '';
   project = value;
+  placementHints.clear();
   $('plate').replaceChildren(...value.plates.map((p) => {
     const option = element('option', `Plate ${p.number}`); option.value = p.number; return option;
   }));
@@ -176,6 +180,7 @@ $('confirm-usage').onclick = () => {
   const filaments = extracted.palette.filter((f) => f.selectable && draft?.has(f.sourceSlot)).map(({ sourceSlot, name, material, color }) => ({ sourceSlot, name, material, color }));
   if (!filaments.length) return;
   confirmedPlates.set(number, { number, filaments }); selections.delete(number);
+  placementHints.delete(number);
   renderFilaments();
 };
 async function inspectSelectedFile() {
@@ -223,6 +228,19 @@ function renderFilament(source, plateNumber) {
     selected.append(element('span', `Requirement: ${value.brand ?? ''} ${value.name} · ${value.materialType}`), colorLabel(value.color), element('span', `${value.sku ? `SKU ${value.sku} · ` : ''}ID ${value.id}`));
   }
   showSelection();
+  if (!placementHints.has(plateNumber)) placementHints.set(plateNumber, new Map());
+  const hints = placementHints.get(plateNumber), hint = hints.get(source.sourceSlot) ?? { ams: '', slot: '' };
+  const placement = element('details'); placement.append(element('summary', 'Optional placement on a named printer'));
+  placement.append(element('p', 'Enter API AMS and slot indices only when you know the physical destination. Source slot indices never determine placement. Leave both empty for Hive to resolve it.', 'hint'));
+  const placementFields = element('div', undefined, 'pair');
+  for (const [key, title, max] of [['ams', 'API AMS ID', 255], ['slot', 'API slot ID', 3]]) {
+    const label = element('label', title), field = element('input'); field.type = 'number'; field.min = '0'; field.max = String(max); field.step = '1'; field.value = hint[key];
+    field.id = `target-${key}-${plateNumber}-${source.sourceSlot}`; field.dataset.targetInput = ''; field.disabled = !$('printer').value.trim();
+    field.setAttribute('aria-label', `${title} for source slot ${source.sourceSlot}`);
+    field.oninput = () => { hint[key] = field.value; hints.set(source.sourceSlot, hint); invalidatePreview(); };
+    label.append(field); placementFields.append(label);
+  }
+  placement.append(placementFields);
   const label = element('label', 'Find a Hive filament by name, SKU, or ID');
   const input = element('input'); input.type = 'search'; input.maxLength = 100; input.value = source.material; input.id = `search-${plateNumber}-${source.sourceSlot}`; label.htmlFor = input.id;
   const search = element('button', 'Search', 'secondary'); search.type = 'button';
@@ -274,15 +292,20 @@ function renderFilament(source, plateNumber) {
   input.oninput = () => { requestVersion++; controller?.abort(); results.replaceChildren(); navigation.hidden = true; status.textContent = 'Press Search to find catalog filaments.'; };
   input.onkeydown = (event) => { if (event.key === 'Enter') { event.preventDefault(); find(); } };
   search.onclick = () => find(); previous.onclick = () => find(Math.max(0, offset - 20)); next.onclick = () => find(offset + 20);
-  row.append(heading, sourceLine, selected, label, input, search, status, results, navigation);
+  row.append(heading, sourceLine, selected, placement, label, input, search, status, results, navigation);
   $('filaments').append(row);
   find();
 }
 function currentInput() {
   const input = {
     id: `browser-${crypto.randomUUID()}`, plates: [Number($('plate').value)], projectData: { filename: project.filename, sha256: project.sha256, plates: [plate()] },
-    mappings: plate().filaments.map((f) => ({ sourceSlot: f.sourceSlot, materialId: chosen().get(f.sourceSlot)?.id })),
+    mappings: plate().filaments.map((f) => {
+      const hint = $('printer').value.trim() ? placementHints.get(Number($('plate').value))?.get(f.sourceSlot) : undefined;
+      if (hint && ((hint.ams === '') !== (hint.slot === ''))) throw new Error(`Source slot ${f.sourceSlot}: enter both placement indices or leave both empty`);
+      return { sourceSlot: f.sourceSlot, materialId: chosen().get(f.sourceSlot)?.id, ...(hint && hint.ams !== '' && hint.slot !== '' ? { targetSlot: { ams_id: Number(hint.ams), slot_id: Number(hint.slot) } } : {}) };
+    }),
     release: $('release-mode').value,
+    on_filament_mismatch: $('filament-mismatch').value,
     ...($('printer').value.trim() ? { printer_id: $('printer').value.trim() } : {}),
   };
   validateMappedInput(input);
@@ -295,7 +318,7 @@ $('preview').onclick = async () => {
     const input = currentInput();
     const resolved = await api('/orders/preview', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) });
     if (version !== previewGeneration) return;
-    $('payload').textContent = JSON.stringify({ ...resolved, release: input.release, ...(input.printer_id ? { printer_id: input.printer_id } : {}) }, null, 2);
+    $('payload').textContent = JSON.stringify({ ...resolved, release: input.release, on_filament_mismatch: input.on_filament_mismatch, ...(input.printer_id ? { printer_id: input.printer_id } : {}) }, null, 2);
     $('payload-colors').replaceChildren(...resolved.filaments.map((f) => colorLabel(f.color, `Source slot ${f.sourceSlot} requirement`)));
   } catch (error) { if (version === previewGeneration) $('payload').textContent = error.message; }
 };
@@ -311,13 +334,41 @@ $('manifest').oninput = () => { renderManifestColors(); sourceGeneration++; extr
 $('apply-manifest').onclick = applyProject;
 $('plate').onchange = renderFilaments;
 $('release-mode').onchange = invalidatePreview;
-$('printer').oninput = invalidatePreview;
+$('filament-mismatch').onchange = invalidatePreview;
+$('printer').oninput = () => { for (const field of document.querySelectorAll('[data-target-input]')) field.disabled = !$('printer').value.trim(); invalidatePreview(); };
 function controls(receipt) {
   const terminal = ['created', 'failed', 'cancelled'].includes(receipt.status);
   $('release').hidden = !(receipt.status === 'held' && receipt.requiredActions?.some((a) => a.code === 'manual_release_required'));
   $('cancel').hidden = terminal;
   $('release').disabled = busy; $('cancel').disabled = busy;
   return terminal;
+}
+function renderJob(receipt) {
+  const read = receipt.jobRead;
+  $('job-details').hidden = receipt.status !== 'created';
+  $('waiting-reasons').replaceChildren(); $('waiting-json').textContent = '[]';
+  $('job-state').textContent = ''; $('job-printer').textContent = ''; $('job-read-error').textContent = ''; $('waiting-summary').textContent = '';
+  if (receipt.status !== 'created') return false;
+  if (read?.kind === 'missing') { $('job-read-error').textContent = 'The job is no longer available. The original creation receipt remains valid.'; return false; }
+  if (read?.kind !== 'available') {
+    $('job-read-error').textContent = read?.code === 'sdk_job_read_unavailable' ? 'This installed SDK cannot read jobs. Install the updated local SDK build to follow filament waiting.' : read?.code === 'job_read_forbidden' ? `Job access was refused with HTTP ${read.upstreamStatus}. Check the server API credential before refreshing. Creation succeeded; do not resubmit.` : 'The job snapshot could not be read. Creation succeeded; refresh status instead of submitting another job.';
+    return shouldPollJob(read);
+  }
+  const job = read.job;
+  $('job-state').textContent = job.status ?? 'Unknown job status';
+  $('job-printer').textContent = job.printer_id ? `Assigned printer: ${job.printer_id}` : 'Smart Queue will choose the physical printer and placement.';
+  const reasons = job.filament_waiting_reasons;
+  const instructions = waitingFilamentInstructions(reasons);
+  $('waiting-json').textContent = JSON.stringify(reasons, null, 2);
+  $('waiting-summary').textContent = instructions.length ? 'Hive reports these material requirements. Source slots identify project filaments; only an API-supplied target identifies a printer tray.' : job.filament_route_state === 'waiting' ? 'Hive is still resolving the material route. No loading details are available yet.' : 'No filament waiting reasons are reported. Printer readiness and claim checks still apply.';
+  for (const instruction of instructions) {
+    const card = element('div', undefined, 'waiting-reason');
+    card.append(element('strong', instruction.source), element('p', instruction.instruction));
+    if (instruction.color) card.append(colorLabel(instruction.color));
+    card.append(element('p', instruction.placement, 'hint'), element('code', instruction.code));
+    $('waiting-reasons').append(card);
+  }
+  return shouldPollJob(read);
 }
 async function poll() {
   clearTimeout(timer);
@@ -328,7 +379,9 @@ async function poll() {
     $('state').textContent = receipt.status; $('request-id').textContent = receipt.requestId ?? 'Awaiting receipt'; $('job-id').textContent = receipt.job?.id ?? '—';
     $('actions').textContent = JSON.stringify(receipt.requiredActions ?? [], null, 2); $('failure').textContent = receipt.error ? JSON.stringify(receipt.error, null, 2) : 'None'; $('error').textContent = '';
     renderReportedColors($('actions-colors'), receipt.requiredActions); renderReportedColors($('failure-colors'), receipt.error);
-    if (!controls(receipt)) timer = setTimeout(poll, 1000);
+    const requestSettled = controls(receipt);
+    const followJob = renderJob(receipt);
+    if (!requestSettled || followJob) timer = setTimeout(poll, 1000);
   } catch (error) { $('error').textContent = `${error.message}. Status is unknown. Polling will retry.`; timer = setTimeout(poll, 3000); }
 }
 $('order-form').onsubmit = async (event) => {

@@ -32,3 +32,13 @@ test('selected catalog IDs resolve server-side into only supported SDK filament 
   assert.equal(resolved.projectData.sha256, 'a'.repeat(64));
   await assert.rejects(resolveMappedInput(input, { get: async () => ({ selectable: false, unavailableReason: 'No single color' }) }), /No single color/);
 });
+test('explicit named-printer placement hints preserve their own AMS indices, independent of source order', async () => {
+  const mapped = { ...input, printer_id: 'mock-printer', mappings: [{ sourceSlot: 3, materialId: idB, targetSlot: { ams_id: 2, slot_id: 1 } }, { sourceSlot: 0, materialId: idA }] };
+  const result = await resolveMappedInput(mapped, { get: async id => ({ id, materialType: 'PETG', color: '#FFFFFF', selectable: true }) });
+  assert.equal('targetSlot' in result.filaments[0], false);
+  assert.deepEqual(result.filaments[1].targetSlot, { ams_id: 2, slot_id: 1 });
+  assert.throws(() => validateMappedInput({ ...mapped, printer_id: undefined }), /named printer/);
+  for (const targetSlot of [null, {}, { ams_id: 0 }, { ams_id: -1, slot_id: 0 }, { ams_id: 256, slot_id: 0 }, { ams_id: 0, slot_id: 4 }, { ams_id: 254, slot_id: 1 }, { ams_id: 0, slot_id: 1, extra: 2 }])
+    assert.throws(() => validateMappedInput({ ...mapped, mappings: [{ ...mapped.mappings[0], targetSlot }, mapped.mappings[1]] }), /Placement hint/);
+  assert.deepEqual(validateMappedInput({ ...mapped, mappings: [{ ...mapped.mappings[0], targetSlot: { ams_id: 255, slot_id: 0 } }, mapped.mappings[1]] }).targetSlots.get(3), { ams_id: 255, slot_id: 0 });
+});

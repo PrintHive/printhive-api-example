@@ -1,0 +1,58 @@
+# Printie single-plate job acceptance plan
+
+## Boundary and ownership
+
+Drive the public sample and simulator through the actual locally packed `@printhive/api` client into an owned isolated real API, Supabase database/Storage and Cloud Slice/HiveSlice engine. Continue through job creation, live job reads and the material claim recheck using mock printers only. Controlled HTTP fixtures establish SDK/UI contracts separately and never stand in for real slicing or persistence proof.
+
+Use current main plus the final waiting-reason PR after it merges. Record both SHAs, packed SDK version/hash and engine/runtime image identities. Do not finalize assertions about unmet-only rows or the cause field before that PR's final shape is known.
+
+Use the verify-api owned partner project and its existing run lock. Hold the lock from seeding through teardown; refuse a busy lock. Never use shared Supabase ports or reset an unowned project. Allocate owned API, Redis and Cloud Slice resources, bind them to loopback and seed API keys privately. Only stop processes and containers created by this run. Do not use the lab Host, real printers, live farm or production writes.
+
+The mock Host fixture must report the plate-selection capability required by the real API. This exercises the admission gate without assuming unreleased Hive Link is installed anywhere. A separate negative case omits that capability and expects `plate_selection_host_update_required`.
+
+## Fixtures
+
+- A tiny real Bambu P1S 0.4 mm, Textured PEI project using supported plain PETG and four distinct source filaments. Choose an actual non-default plate in a multi-plate fixture so plate preservation is observable. Avoid PETG-CF here; stock-profile expansion is separate work under #4942.
+- A mock named P1S printer in the test organization with a known four-slot AMS route, ready/bed-clear facts and the required mock Host capability. No network connection or G-code sender may exist for it.
+- Four typed requirements with original zero-based Source Slots. For deterministic slot instructions, one case supplies explicit physical target hints with separate AMS and slot IDs. A second omits hints to prove the UI never equates Source Slot with physical slot.
+- Initially load three correct filaments and leave the fourth hinted slot empty. Also prepare wrong-type, wrong-color, duplicate-route, foreign-organization and unknown-nozzle cases. Fixture mutations use only the owned test organization.
+- Seed one explicit organization color threshold. Pick one color inside that threshold but outside the historical default, and one outside the configured threshold. Use the same values for admission and claim assertions.
+
+## Acceptance scenarios
+
+| Scenario                     | Action                                                                                            | Observable assertion                                                                                                                                                                                                                   |
+| ---------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One plate and named target   | SDK multipart create with file, plate, printer, typed filaments, automatic release and stable key | 202 create request; eventual created receipt names one job on that printer. Job and artifact retain the selected original plate.                                                                                                       |
+| Real processing gate         | Pause output processing after real slicing completes, then resume                                 | Receipt stays preparing and no job is admitted until the output Model File is ready. Processing failure/timeout surfaces its real code and creates no job.                                                                             |
+| Three of four loaded         | Create with wait/default while one hinted slot is empty                                           | Job exists but is material-waiting. After the waiting-reason PR, exactly the one unmet Source Slot is listed with its authoritative material/color, cause and physical suggestion when provided. Three satisfied filaments are absent. |
+| Waiting claim                | Mock printer attempts to claim the waiting job                                                    | Claim is refused and execution does not start; the named printer binding remains unchanged. Persisted waiting reasons remain observable. Other eligible work can be considered where that behavior is implemented.                                                                              |
+| Load the fourth filament     | Update only the mock slot, then run the normal claim recheck                                      | Job becomes claimable under current readiness/material checks; stale waiting reasons are cleared or updated according to the final contract. No G-code or printer command is dispatched.                                               |
+| Explicit reject              | New SDK request with reject and the same missing-filament state                                   | Synchronous 422 or the documented asynchronous failed receipt exposes the material rejection. Polling does not invent a successful job. No job is admitted for this create request.                                                    |
+| Changed spool before claim   | Create while all four match; swap one mock spool before claiming                                  | Claim refuses the changed route and writes the current unmet reason; a create-time match does not bypass claim. Restoring the required material permits a later normal claim.                                                          |
+| Organization color threshold | Repeat wait/reject and claim with the inside/outside test colors                                  | Admission and claim agree using the configured organization threshold, including the color outside the historical default.                                                                                                             |
+| Distinct causes              | Exercise empty slot, absent material, color mismatch and route collision                          | Final contract reports the corresponding cause on unmet rows. Keep `filament_not_loaded` and `material_route_changed` code semantics separate from the additive cause.                                                                 |
+| Unhinted placement           | Submit requirements without physical hints                                                        | UI identifies unmet Source Slots and requirements without inventing a physical slot from source index or array position.                                                                                                               |
+| Replay and restart           | Lose a response after server commit; retry using durable state across process restart             | Same create request and job, same file/plate/requirements/policy, no duplicate admission. Changed bytes, printer, plate, filaments or mismatch policy conflict with the retained intent.                                               |
+| Manual release               | Prepare with manual mode                                                                          | Held receipt shows manual authorization action after processing. No job appears before an explicit authorized release in the isolated fixture. Other preparation holds cannot be cleared by manual release.                            |
+| Read failures                | Delete a created job; exercise missing job, revoked key and foreign organization                  | Retained receipt remains truthful; live job read returns its real error. UI distinguishes missing/deleted/read failure from loading, preparing and material waiting.                                                                   |
+| Readiness and capability     | Remove bed-clear/readiness or mock Host plate-selection capability                                | Existing readiness fences remain effective and missing capability produces the real hold. No automatic retries bypass these gates.                                                                                                     |
+| Polling lifecycle            | Exercise long preparing state, held/failed/cancelled receipts, job waiting and job state updates  | Bounded polling, cancellation and recovery preserve the receipt and job identities. Timeouts are unsettled, never successful completion.                                                                                               |
+
+## Sample and simulator proof
+
+Run the same typed request and wait/reject cases through both consumers. Log API method/path, status, duration, create request ID, job ID, selected plate, named target and sanitized waiting reasons. Never log headers, API keys, signed URLs or full upstream bodies.
+
+Record a desktop and phone UI demo against the owned stack covering upload/extraction, plate and material selection, named printer, mismatch policy, request polling, the three-of-four waiting view, updated job read and reject outcome. Inspect each final exported recording. Keep fixture-only UI captures separately labeled.
+
+The waiting view must show only the API's unmet rows after the new contract lands. Render readable Material Type/color and a swatch, Source Slot identity, cause explanation and authoritative target suggestion. Explain when physical placement remains unresolved. Preserve zero-based API values in the request preview and explicitly label any one-based human display conversion.
+
+## Execution and evidence
+
+1. Confirm Docker, available owned ports, run-lock ownership, Node 24 and dependency builds before seeding. Run engine containers sequentially within the approved resource budget.
+2. Build and pack the SDK with normal schema drift checks. Install that exact tarball in the sample without changing the registry pin. Run SDK, sample and simulator contract tests first.
+3. Seed the owned organization, Control/Read keys, supported feature flags, mock Host/printer facts and four-slot material fixture. Bring up real Cloud Slice callbacks and output processing. Doctor/health alone do not establish workflow success.
+4. Run the table scenarios with bounded deadlines and record actual results. If Storage, engine execution, callback authentication, processing or claim cannot complete, report that stage as blocked or failed rather than substituting fake completion.
+5. Verify request/job identities, generated selected-plate artifact, persisted waiting reasons, reject non-admission and claim results through public reads where available. Use direct database inspection only for assertions that the API cannot expose and for owned fixture setup/cleanup.
+6. Inspect UI evidence, tear down only owned resources and release the lock. Preserve sanitized transcripts, coverage results and the exact source/package/image identities.
+
+This plan proves software admission and claim behavior with mock printers. It does not prove physical printing, production deployment or Hive Link 4.25.59 rollout. Docker was unresponsive during the initial update audit, so no new real-stack run is claimed yet.

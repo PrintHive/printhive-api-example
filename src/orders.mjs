@@ -2,7 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, open, rename } from "node:fs/promises";
 import { join, basename } from "node:path";
 import { PrintJobCreateStoppedError } from "@printhive/api";
-import { resolveMappedInput, validateMappedInput } from "./project-data.mjs";
+import { resolveMappedInput, validateMappedInput, validateTargetSlot } from "./project-data.mjs";
+import { readCreatedJob } from "./job-status.mjs";
 
 export function validateOrder(order) {
   if (
@@ -29,12 +30,14 @@ export function validateOrder(order) {
     (order.printer_id !== undefined &&
       (typeof order.printer_id !== "string" || !order.printer_id.trim())) ||
     (order.release !== undefined &&
-      !["manual", "automatic"].includes(order.release))
+      !["manual", "automatic"].includes(order.release)) ||
+    (order.on_filament_mismatch !== undefined && !["wait", "reject"].includes(order.on_filament_mismatch))
   ) {
     throw new Error(
       "Invalid order: supply id, file, unique positive plates, and typed filaments",
     );
   }
+  for (const filament of order.filaments) validateTargetSlot(filament.targetSlot);
   return order;
 }
 
@@ -73,7 +76,7 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}, cat
     else validateOrder(input);
     const bytes = await readFile(input.file);
     if (mapped) {
-      const { projectData, mappings } = validateMappedInput(input);
+      const { projectData, mappings, targetSlots } = validateMappedInput(input);
       if (createHash("sha256").update(bytes).digest("hex") !== projectData.sha256 || basename(input.file) !== projectData.filename)
         throw new Error("Project data belongs to a different file");
       let saved;
@@ -81,8 +84,9 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}, cat
       catch (error) { if (error.code !== "ENOENT") throw error; }
       if (saved) {
         const sort = (entries) => entries.sort(([left], [right]) => left - right);
-        const retained = saved.intent.catalogSelections?.map(({ sourceSlot, id }) => [sourceSlot, id.toLowerCase()]);
-        const requested = [...mappings].map(([slot, id]) => [slot, id.toLowerCase()]);
+        const placement = (target) => target ? [target.ams_id, target.slot_id] : null;
+        const retained = saved.intent.catalogSelections?.map(({ sourceSlot, id }) => [sourceSlot, id.toLowerCase(), placement(saved.intent.filaments.find((f) => f.sourceSlot === sourceSlot)?.targetSlot)]);
+        const requested = [...mappings].map(([slot, id]) => [slot, id.toLowerCase(), placement(targetSlots.get(slot))]);
         if (!retained || JSON.stringify(sort(retained)) !== JSON.stringify(sort(requested)))
           throw new Error("Order id conflicts with stored intent");
         input = { ...input, projectData, filaments: saved.intent.filaments, catalogSelections: saved.intent.catalogSelections };
@@ -99,13 +103,15 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}, cat
       filaments: order.filaments,
       ...(order.projectData ? { projectData: order.projectData, catalogSelections: order.catalogSelections } : {}),
       release: order.release ?? "automatic",
+      on_filament_mismatch: order.on_filament_mismatch ?? "wait",
       ...(order.printer_id ? { printer_id: order.printer_id } : {}),
     };
     await mkdir(directory, { recursive: true, mode: 0o700 });
     let record;
     try {
       record = await load(order.id);
-      if (JSON.stringify(record.intent) !== JSON.stringify(intent))
+      const comparable = ({ on_filament_mismatch, ...value }) => ({ ...value, on_filament_mismatch: on_filament_mismatch ?? "wait" });
+      if (JSON.stringify(comparable(record.intent)) !== JSON.stringify(comparable(intent)))
         throw new Error("Order id conflicts with stored intent");
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
@@ -132,11 +138,12 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}, cat
       if (item.requestId) continue;
       const receipt = await hive.printJobs.create({
         file: record.source,
-        filename: intent.filename,
+        filename: record.intent.filename,
         plate: item.plate,
-        filaments: intent.filaments,
-        release: intent.release,
-        ...(intent.printer_id ? { printer_id: intent.printer_id } : {}),
+        filaments: record.intent.filaments,
+        release: record.intent.release,
+        ...(record.intent.on_filament_mismatch ? { on_filament_mismatch: record.intent.on_filament_mismatch } : {}),
+        ...(record.intent.printer_id ? { printer_id: record.intent.printer_id } : {}),
         idempotencyKey: item.idempotencyKey,
       });
       item.requestId = receipt.requestId;
@@ -156,12 +163,10 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}, cat
       return {
         id,
         plates: await Promise.all(
-          record.plates.map(async (item) => ({
-            plate: item.plate,
-            ...(item.requestId
-              ? await hive.printJobs.getCreateRequest(item.requestId)
-              : { status: "pending_submission" }),
-          })),
+          record.plates.map(async (item) => {
+            const receipt = item.requestId ? await hive.printJobs.getCreateRequest(item.requestId) : { status: "pending_submission" };
+            return { plate: item.plate, ...receipt, jobRead: await readCreatedJob(hive, receipt) };
+          }),
         ),
       };
     },

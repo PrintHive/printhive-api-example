@@ -69,7 +69,10 @@
       <div id="filaments"></div>
     </fieldset>
     <label for="printer">Printer ID (optional)</label><input id="printer" type="text" placeholder="Leave empty for Smart Queue">
-    <p class="hint">A created job may still wait for materials or printer readiness.</p>
+    <p class="hint">Enter a mock printer UUID for the isolated end-to-end test. Leave empty for Smart Queue. A named printer stays assigned to this job.</p>
+    <label for="filament-mismatch">When the named printer is missing filament</label>
+    <select id="filament-mismatch"><option value="wait">Wait · create a job and report loading requirements</option><option value="reject">Reject · refuse the mismatch with HTTP 422</option></select>
+    <p class="hint">A created job may still wait for materials or printer readiness. Production admission may report plate_selection_host_update_required until its Host supports plate selection.</p>
     </fieldset>
     <button id="preview" type="button" class="secondary" disabled>Preview API request</button>
     <div id="payload-colors" class="color-legend" aria-label="Request preview colors"></div>
@@ -84,6 +87,16 @@
       <dl><dt>Order ID</dt><dd id="order-id"></dd><dt>Request ID</dt><dd id="request-id"></dd><dt>Job ID</dt><dd id="job-id">—</dd></dl>
       <h3>Required actions</h3><div id="actions-colors" class="color-legend" aria-label="Required action colors"></div><pre id="actions">[]</pre>
       <h3>Error</h3><div id="failure-colors" class="color-legend" aria-label="Reported error colors"></div><pre id="failure">None</pre>
+      <div id="job-details" hidden>
+        <h3>Created job</h3>
+        <p id="job-state" class="state" role="status" aria-live="polite"></p>
+        <p id="job-printer" class="hint"></p>
+        <p id="job-read-error" role="status"></p>
+        <h3>Filament loading requirements</h3>
+        <p id="waiting-summary" class="hint"></p>
+        <div id="waiting-reasons" aria-label="Job filament waiting reasons"></div>
+        <details><summary>API job waiting reasons</summary><pre id="waiting-json">[]</pre></details>
+      </div>
       <div class="pair"><button type="button" id="release" hidden>Release</button><button type="button" id="cancel" class="secondary" hidden>Cancel</button></div>
       <button type="button" id="refresh" class="secondary">Refresh status</button>
     </div>
