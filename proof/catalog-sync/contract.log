@@ -1,0 +1,15 @@
+{
+  "fixture": "owned loopback HTTP contract, not production or real database",
+  "sdk": "0.3.0 local package",
+  "passed": [
+    "preview zero SDK calls",
+    "whole-batch validation before writes",
+    "lost response replays identical JSON and encoded external-ID key",
+    "partial 422 failure sanitized",
+    "update retains UUID",
+    "list filters preserve special characters",
+    "get and 404 propagation",
+    "explicit failed-record retry"
+  ],
+  "wireCalls": 8
+}

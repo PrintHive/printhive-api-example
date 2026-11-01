@@ -50,7 +50,9 @@ test('multipart upload persists source bytes and supports status, release, and c
 test('JSON bundled fixture and allowlisted page assets work without exposing URL secrets', async (t) => {
   const s = await setup(t);
   const config = await (await fetch(`${s.url}/config`)).json();
-  assert.deepEqual(config, { baseUrl: 'http://127.0.0.1:9999/api', production: false, maxUploadBytes: MAX_UPLOAD_BYTES });
+  assert.deepEqual({ ...config, sdk: undefined }, { baseUrl: 'http://127.0.0.1:9999/api', production: false, maxUploadBytes: MAX_UPLOAD_BYTES, sdk: undefined });
+  assert.equal(typeof config.sdk.version, 'string');
+  assert.equal(config.sdk.capabilities.filamentCatalog, false);
   for (const path of ['/', '/app.js', '/style.css']) assert.equal((await fetch(s.url + path)).status, 200);
   assert.equal((await fetch(s.url + '/src/client.mjs')).status, 404);
   assert.equal((await fetch(s.url + '/orders', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...input, file: 'cube.3mf' }) })).status, 202);

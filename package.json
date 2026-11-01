@@ -6,7 +6,8 @@
     "start": "node src/server.mjs",
     "send-print": "node src/cli.mjs",
     "test": "node --test",
-    "proof": "node proof/run.mjs"
+    "proof": "node proof/run.mjs",
+    "sdk:local": "node scripts/use-local-sdk.mjs"
   },
   "keywords": [],
   "author": "",

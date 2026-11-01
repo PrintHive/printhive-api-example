@@ -19,3 +19,7 @@ A physical filament route on the printer chosen to run the job. Smart Queue can 
 ## Saved slice usage
 
 A record of source filaments involved in a previous slicing of a plate. It can differ from the current project's filament usage.
+
+## Partner catalog identity
+
+A stable filament identity assigned by a partner, linking that partner’s catalog entry to its organization’s Hive catalog filament. Updating a catalog entry is separate from changing the requirements of an existing print order.

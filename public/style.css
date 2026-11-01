@@ -59,3 +59,10 @@ summary { cursor: pointer; font-weight: 600; }
 .color-legend, .catalog-characteristics { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 8px 0; font-size: .8rem; }
 .color-legend:empty { display: none; }
 .selection { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.catalog-sync-panel { margin-top: 20px; background: white; padding: 18px; }
+.catalog-sync-panel > summary { font-size: 1.05rem; }
+.sync-records { display: grid; gap: 10px; margin: 14px 0; }
+.sync-record { display: grid; gap: 6px; padding: 12px; border: 1px solid #b2b8b8; border-radius: 4px; font-size: .85rem; overflow-wrap: anywhere; min-width: 0; }
+.sync-record button { justify-self: start; }
+.sync-record input[readonly] { margin-bottom: 0; font-family: monospace; }
+#sync-error { color: #a32620; }

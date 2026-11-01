@@ -191,3 +191,62 @@ The index conversions follow Bambu Studio's format at revision 79df7ae309be398ed
 - [Saved plate index](https://github.com/bambulab/BambuStudio/blob/79df7ae309be398ed30c9f397c13c9911c2edc57/src/libslic3r/Format/bbs_3mf.cpp#L8782) and [one-based filament IDs](https://github.com/bambulab/BambuStudio/blob/79df7ae309be398ed30c9f397c13c9911c2edc57/src/libslic3r/Format/bbs_3mf.cpp#L8901).
 
 These records describe saved slicing results. They can be absent, stale, or overinclusive, so the demo labels them as hints and still requires confirmation. It does not substitute object extruder assignments for a complete painting, support, or feature-level material analysis.
+
+## Sync Printie’s filament catalog
+
+The **Sync Printie filament catalog** panel is separate from print orders. It writes organization-owned catalog records through `hive.filamentCatalog.upsert`; read-back uses the same SDK’s `list` and `get` methods. The existing requirement search still reads the broader global and organization catalog.
+
+### Use the locally packed SDK
+
+The registry dependency remains `@printhive/api@0.2.0`. That version supports the existing print flow but lacks `filamentCatalog`. Until the merged SDK 0.3.0 is published to npm, install its locally built package for this checkout:
+
+```sh
+npm run sdk:local -- /absolute/path/to/printhive-api-0.3.0.tgz
+```
+
+The helper runs `npm install --no-save --package-lock=false`, verifies the required methods without making a network request, and records the local package’s version/hash under ignored `data/sdk-local.json`. It does not publish anything or change the portable registry dependency/lockfile. Restart the example after installing. The page shows the loaded SDK version, local-package provenance when present, and actual method availability. Capability comes from `hive.filamentCatalog` methods, not a version guess or the marker.
+
+A clean `npm ci` restores the registry package. With an older SDK, catalog sync/read controls are unavailable, while print creation and existing requirement search remain available. Validation preview still works locally. There is no parallel REST fallback for catalog sync.
+
+### Preview and sync catalog records
+
+Paste or import a JSON array, or an object containing only `records`:
+
+```json
+[
+  {
+    "externalId": "printie-filament-123",
+    "brand": "Example",
+    "material": "PETG",
+    "colorName": "Green",
+    "colorHex": "#39FF14",
+    "sku": "PETG-GREEN",
+    "replacementFilamentId": null
+  }
+]
+```
+
+`externalId` is Printie’s stable filament identity. It is distinct from a project’s source slot and from the Hive catalog UUID returned after sync. This is the example’s explicit catalog-record schema, not a claim about every field in Printie’s HAR payload.
+
+1. Import or paste 1–20 records. Importing changes only the local editor.
+2. Click **Validate and preview**. Every record is checked before any write, including required fields, lengths, hex colors, unsupported fields, and duplicate trimmed external IDs. No catalog write occurs during preview.
+3. Review canonical external IDs, SKUs, material types, and color swatches. `hex` is accepted as an alias for `colorHex`; if both exist they must agree. Colors normalize to uppercase. Brand/material/color names are bounded to 100 characters, external IDs/SKUs to 200, and the whole request to 64 KiB.
+4. Click **Sync this record** or the explicit batch **Sync … to production** button. This is a real catalog write to the displayed API destination. Batch records run sequentially. The UI reports each confirmed record and each uncertain/error outcome, preserving partial results.
+5. Use **Refresh synced catalog** or **Read filament** to read current Hive bindings by external ID, SKU, or Hive UUID. Reads are organization-scoped by the API. Retrying an external ID targets its stable catalog identity; the UI does not invent created/updated flags. For an uncertain result, read current state before retrying.
+
+`replacementFilamentId` is optional informational metadata, at most 200 characters or null. It does not authorize a substitute, change an existing order, or automatically replace another SKU.
+
+Catalog upsert requires the API key’s Control permission; list/read require Read permission. Credentials remain on the backend. The browser receives only the fields needed to show the Printie-to-Hive binding. Errors omit raw upstream bodies, SQL, headers and credentials.
+
+Local routes:
+
+- `POST /catalog-sync/preview`: validates the entire import; no SDK calls.
+- `POST /catalog-sync/upsert`: validates the entire batch before sequential SDK upserts; returns per-record confirmed/error outcomes.
+- `GET /catalog-sync/list?externalId=…&sku=…&limit=20&offset=0`: reads synced organization catalog entries through the SDK.
+- `GET /catalog-sync/filaments/{id}`: reads one synced binding through the SDK.
+
+After sync, copy the product’s SKU or Hive UUID into the existing source-filament requirement chooser. The example does not guess which source slot gets that product. Print orders still send only the supported `{ sourceSlot, material, color, targetSlot? }` fields, and this UI continues to omit `targetSlot`. Exact product/SKU enforcement is separate API work; syncing a catalog identity does not add that guarantee to a job.
+
+Automated verification uses injected SDK fixtures and read-only production catalog checks. It must not click Sync or submit orders against production merely to verify the UI.
+
+See [catalog sync verification](proof/catalog-sync/README.md) for the real SDK contract checks, production read results, desktop and phone demos, and remaining proof limits.

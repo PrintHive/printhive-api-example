@@ -6,12 +6,36 @@
   <title>PrintHive · Try a print order</title>
   <link rel="stylesheet" href="/style.css">
   <script src="/app.js" type="module"></script>
+  <script src="/catalog-sync.js" type="module"></script>
 </head>
 <body>
 <main>
   <header><p class="eyebrow">PrintHive / API example</p><h1>Try a print order</h1><p>One project, one plate. Follow the request until a job is created.</p></header>
   <aside id="target" role="status">Loading API destination…</aside>
+  <p id="sdk-info" class="hint" role="status">Loading SDK information…</p>
   <p id="warning" class="warning">Auto release in production queues a real print. Review your destination and release mode before submitting.</p>
+  <details id="catalog-sync" class="catalog-sync-panel">
+    <summary>Sync Printie filament catalog</summary>
+    <p>This updates your organization’s Hive catalog. It does not create an order or select a filament for a build plate.</p>
+    <p id="sync-capability" class="hint" role="status">Checking SDK catalog support…</p>
+    <label for="sync-file">Import Printie catalog records as JSON</label><input id="sync-file" type="file" accept=".json,application/json">
+    <label for="sync-input">Catalog records</label><textarea id="sync-input" rows="9" spellcheck="false" maxlength="65536" placeholder='[{"externalId":"printie-filament-123","brand":"Example","material":"PETG","colorName":"Green","colorHex":"#39FF14","sku":"PETG-GREEN"}]'></textarea>
+    <p class="hint">Import 1–20 records with externalId, brand, material, colorName, colorHex or hex, and SKU. replacementFilamentId is optional informational data; it does not authorize substitution. Importing and previewing never sync records.</p>
+    <button id="sync-preview" type="button" class="secondary">Validate and preview</button>
+    <div id="sync-preview-records" class="sync-records" aria-label="Catalog sync preview"></div>
+    <div class="pair"><button id="sync-all" type="button" disabled>Sync previewed records</button><button id="sync-retry" type="button" class="secondary" disabled>Retry failed records</button></div>
+    <p id="sync-status" role="status" aria-live="polite"></p>
+    <p id="sync-error" role="alert"></p>
+    <div id="sync-outcomes" class="sync-records" aria-label="Catalog sync outcomes"></div>
+    <h3>Read synced Hive bindings</h3>
+    <div class="pair"><div><label for="sync-filter-external">Printie external ID</label><input id="sync-filter-external" maxlength="200"></div><div><label for="sync-filter-sku">SKU</label><input id="sync-filter-sku" maxlength="200"></div></div>
+    <button id="sync-refresh" type="button" class="secondary" disabled>Refresh synced catalog</button>
+    <div class="pair"><button id="sync-previous" type="button" class="secondary" disabled>Previous</button><button id="sync-next" type="button" class="secondary" disabled>More synced records</button></div>
+    <div class="pair"><div><label for="sync-get-id">Read a synced Hive filament UUID</label><input id="sync-get-id" maxlength="36" placeholder="Hive filament UUID"></div><button id="sync-get" type="button" class="secondary" disabled>Read filament</button></div>
+    <p id="sync-read-status" class="hint" role="status"></p>
+    <div id="sync-read-results" class="sync-records" aria-label="Synced catalog bindings"></div>
+    <p class="hint">Copy a synced SKU or Hive UUID into a source filament’s requirement search below. Job matching still uses material type and color, not exact SKU identity.</p>
+  </details>
   <div class="layout">
   <form id="order-form">
     <h2>Prepare your order</h2>

@@ -13,3 +13,10 @@ proof/plate-extraction/results.json
 proof/plate-colors/*.png
 proof/plate-colors/*.webm
 proof/plate-colors/results.json
+
+proof/catalog-sync/*.png
+proof/catalog-sync/*.jpg
+proof/catalog-sync/*.webm
+proof/catalog-sync/*-results.json
+proof/catalog-sync/production.json
+!proof/catalog-sync/contract.log

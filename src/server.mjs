@@ -1,3 +1,5 @@
+import { createCatalogSync, catalogSyncError } from "./catalog-sync.mjs";
+import { sdkInfo } from "./sdk-info.mjs";
 import { inspectProject } from "./project-inspection.mjs";
 import { createHash } from "node:crypto";
 import { validateCatalogQuery } from "./catalog.mjs";
@@ -15,6 +17,8 @@ const publicDir = fileURLToPath(new URL("../public/", import.meta.url));
 const assets = new Map([
   ["/", ["index.html", "text/html; charset=utf-8"]],
   ["/app.js", ["app.js", "text/javascript; charset=utf-8"]],
+  ["/catalog-sync.js", ["catalog-sync.js", "text/javascript; charset=utf-8"]],
+  ["/colors.mjs", ["colors.mjs", "text/javascript; charset=utf-8"]],
   ["/project-data.mjs", ["../src/project-data.mjs", "text/javascript; charset=utf-8"]],
   ["/style.css", ["style.css", "text/css; charset=utf-8"]],
 ]);
@@ -32,6 +36,7 @@ async function readBody(req, limit) {
 
 export function createOrderServer({ hive, control, catalog, directory = "data", designs = "fixtures", baseUrl = "https://api.printhiv3d.com" }) {
   const orders = createOrders(hive, directory, undefined, catalog);
+  const sync = createCatalogSync(hive);
   designs = resolve(designs);
   // Show the destination without URL credentials, query strings, or fragments.
   const target = new URL(baseUrl);
@@ -55,6 +60,23 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
           "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
         });
         return res.end(bytes);
+      }
+      if (pathname.startsWith("/catalog-sync/")) {
+        try {
+          if (req.method === "POST" && ["/catalog-sync/preview", "/catalog-sync/upsert"].includes(pathname)) {
+            if (!req.headers["content-type"]?.startsWith("application/json")) return reply(400, { error: "Use application/json for catalog records" });
+            let input;
+            try { input = JSON.parse(await readBody(req, 65536)); }
+            catch (error) { if (error instanceof SyntaxError) return reply(400, { error: "Catalog input must be valid JSON" }); throw error; }
+            return reply(200, pathname === "/catalog-sync/preview" ? sync.preview(input) : await sync.upsert(input));
+          }
+          if (req.method === "GET" && pathname === "/catalog-sync/list") return reply(200, await sync.list(new URL(req.url, "http://localhost").searchParams));
+          if (req.method === "GET" && parts.length === 3 && parts[1] === "filaments") return reply(200, await sync.get(parts[2]));
+          return reply(404, { error: "Catalog sync operation not found" });
+        } catch (error) {
+          if (error.status === 413) return reply(413, { error: "Catalog input exceeds 64 KiB" });
+          const failure = catalogSyncError(error); return reply(failure.status, { error: failure.error });
+        }
       }
       if (req.method === "GET" && pathname === "/catalog") {
         if (!catalog) return reply(503, { error: "Hive catalog is unavailable" });
@@ -90,7 +112,7 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
         } catch { return reply(400, { error: "A selected Hive filament cannot form a single-color requirement. Search again and choose a current catalog entry." }); }
       }
       if (req.method === "GET" && pathname === "/config")
-        return reply(200, { baseUrl: displayUrl, production, maxUploadBytes: MAX_UPLOAD_BYTES });
+        return reply(200, { baseUrl: displayUrl, production, maxUploadBytes: MAX_UPLOAD_BYTES, sdk: sdkInfo(hive) });
       if (req.method === "POST" && pathname === "/orders") {
         const type = req.headers["content-type"] ?? "";
         let input;
