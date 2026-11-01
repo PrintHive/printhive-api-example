@@ -6,7 +6,7 @@ The running example uses the real production API and a locally packed build of t
 
 Verified on November 1, 2026, with Node 24.18.0 and locally packed `@printhive/api@0.3.0` from Hive commit `e76e7b9eeeaf02c4907b13c70201c09fa31b3d1d`. The tarball SHA-256 is `dbf86de3ce92cd0cac11994d73cc9fd2730b0e953dd768572c45a27dfb7c8fd3`.
 
-The merged SDK's normal build and OpenAPI drift check passed. Its tests passed with 55 successes and one existing opt-in skip. The example passed all 40 tests. Independent Sol review approved the implementation without findings.
+The merged SDK's normal build and OpenAPI drift check passed. Its tests passed with 55 successes and one existing opt-in skip. The example passed all 40 tests. Independent Sol review approved the implementation without findings. A second round approved the new proof scripts and suggested including the ignored transcript; its ignore exception is now explicit. Both rounds used GPT-6.1 Sol at high effort. Token usage was not exposed. Review caused no application-code changes. The implementation diff had 505 additions and 19 deletions; proof scripts, documentation and artifact exclusions bring the final diff to 726 additions and 19 deletions. Nothing was pushed.
 
 | Surface | API or method | Observed result |
 | --- | --- | --- |
