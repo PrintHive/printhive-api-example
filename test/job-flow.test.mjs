@@ -11,12 +11,49 @@ import { PrintHive } from '@printhive/api';
 import { createHash } from 'node:crypto';
 
 test('three of four loaded: display API-reported unmet source without inventing its physical slot', () => {
-  const result = waitingFilamentInstructions([{ code: 'filament_not_loaded', sourceSlot: 7, material: 'PETG', color: '#112233' }]);
+  const result = waitingFilamentInstructions([{ code: 'filament_not_loaded', sourceSlot: 7, material: 'PETG', color: '112233', cause: 'missing_material' }]);
   assert.equal(result.length, 1);
   assert.equal(result[0].source, 'Source slot 7');
   assert.equal(result[0].instruction, 'Load PETG #112233 for source slot 7.');
   assert.match(result[0].placement, /No physical slot supplied/);
   assert.equal(result[0].placement.includes('slot 7'), false);
+  assert.equal(result[0].color, '#112233');
+  assert.equal(result[0].explanation, 'The required material is not loaded.');
+});
+test('waiting instructions explain each cause while keeping optional and future causes readable', () => {
+  const descriptions = [
+    ['slot_empty', 'The requested printer slot is empty.'],
+    ['missing_material', 'The required material is not loaded.'],
+    ['color_distance', 'The loaded color is outside the allowed color distance.'],
+    ['slot_conflict', 'The printer slots cannot satisfy all filament requirements at the same time.'],
+  ];
+  for (const [cause, explanation] of descriptions) {
+    const [instruction] = waitingFilamentInstructions([{ code: 'filament_not_loaded', sourceSlot: 3, material: 'PETG', color: 'FFFFFF', cause }]);
+    assert.equal(instruction.cause, cause);
+    assert.equal(instruction.explanation, explanation);
+    assert.equal(instruction.instruction, 'Load PETG #FFFFFF for source slot 3.');
+  }
+  const base = { code: 'filament_not_loaded', sourceSlot: 0, material: 'PETG', color: '#ffffff' };
+  const legacy = waitingFilamentInstructions([base])[0];
+  assert.equal(legacy.color, '#FFFFFF');
+  assert.equal(legacy.explanation, null);
+  for (const cause of ['future_cause', 'constructor', '__proto__']) {
+    const future = waitingFilamentInstructions([{ ...base, cause }])[0];
+    assert.equal(future.cause, cause);
+    assert.equal(future.instruction, legacy.instruction);
+    assert.equal(future.explanation, 'Hive reported another material-waiting condition. Check the API waiting reasons.');
+  }
+});
+test('waiting color normalization rejects CSS and preserves only the returned sparse source identities', () => {
+  for (const color of ['red', 'FFFFFF;background:url(x)', '#fff', '#FFFFFF00', '<script>']) {
+    const [instruction] = waitingFilamentInstructions([{ sourceSlot: 3, material: 'PETG', color }]);
+    assert.equal(instruction.color, null);
+    assert.equal(instruction.instruction, 'Load PETG for source slot 3.');
+  }
+  const reasons = [{ sourceSlot: 3, material: 'PETG', color: 'FFFFFF' }, { sourceSlot: 7, material: 'PETG', color: '#000000' }];
+  assert.deepEqual(waitingFilamentInstructions(reasons).map(row => row.source), ['Source slot 3', 'Source slot 7']);
+  assert.deepEqual(reasons.map(row => row.color), ['FFFFFF', '#000000']);
+  assert.deepEqual(waitingFilamentInstructions([]), []);
 });
 test('only API-supplied target indices identify a tray; route-change reasons remain actionable', () => {
   const result = waitingFilamentInstructions([{ code: 'filament_not_loaded', sourceSlot: 3, material: 'PETG', color: '#000000', suggestedTargetSlot: { ams_id: 2, slot_id: 1 } }, { code: 'material_route_changed' }]);
@@ -26,7 +63,7 @@ test('only API-supplied target indices identify a tray; route-change reasons rem
 });
 test('created request reads actual job status and waiting reasons, without treating creation as matched', async () => {
   const events = [];
-  const reason = { code: 'filament_not_loaded', sourceSlot: 3, material: 'PETG', color: '#FFFFFF' };
+  const reason = { code: 'filament_not_loaded', sourceSlot: 3, material: 'PETG', color: 'FFFFFF', cause: 'missing_material' };
   const read = await readCreatedJob({ printJobs: { get: async id => { events.push(id); return { id, status: 'pending', printer_id: 'mock-printer', print_options: { filament_route_state: 'waiting', filament_waiting_reasons: [reason] } }; } } }, { status: 'created', job: { id: 42 } });
   assert.deepEqual(events, [42]);
   assert.equal(read.kind, 'available');
@@ -67,14 +104,16 @@ test('mismatch policy is durable request intent and rejects changed policy on re
   await assert.rejects(orders.submit({ ...input, on_filament_mismatch: 'wrong' }), /Invalid order/);
 });
 test('updated SDK follows persisted upload through create request and real job snapshot contract', async t => {
-  const { directory, input } = await fixture(t), events = [];
+  const { directory, input: base } = await fixture(t), events = [];
+  const input = { ...base, filaments: ['#000000', '#FFFFFF', '#FF0000', '#0000FF'].map((color, sourceSlot) => ({ sourceSlot, material: 'PETG', color })) };
   const requestId = '00000000-0000-4000-8000-000000000001';
-  const reason = { code: 'filament_not_loaded', sourceSlot: 3, material: 'PETG', color: '#0000FF' };
-  const created = { requestId, status: 'created', externalId: null, createdAt: '2026-01-01T00:00:00Z', job: { id: 42, status: 'QUEUED', printer_id: '00000000-0000-4000-8000-000000000002', model_file_id: null, print_options: null }, requiredActions: [], error: null };
+  const reason = { code: 'filament_not_loaded', sourceSlot: 3, material: 'PETG', color: '0000FF', cause: 'missing_material' };
+  const created = { requestId, status: 'created', externalId: null, createdAt: '2026-01-01T00:00:00Z', job: { id: 42, status: 'QUEUED', printer_id: '00000000-0000-4000-8000-000000000002', model_file_id: null, print_options: { filament_waiting_reasons: [reason] } }, requiredActions: [], error: null };
   const hive = new PrintHive({ apiKey: 'test-only-contract', baseUrl: 'http://127.0.0.1:1', fetch: async (url, options) => {
     const path = new URL(url).pathname; events.push(`${options.method} ${path}`);
     if (options.method === 'POST') {
       assert(options.body instanceof FormData); assert.equal(options.body.get('plate'), '2'); assert.equal(options.body.get('on_filament_mismatch'), 'wait'); assert.equal(options.body.get('printer_id'), 'mock-printer');
+      assert.deepEqual(JSON.parse(options.body.get('filaments')), input.filaments);
       return Response.json({ ...created, status: 'preparing', job: null }, { status: 202 });
     }
     return Response.json(path.endsWith(requestId) ? created : { job: { id: 42, status: 'QUEUED', print_options: { filament_route_state: 'waiting', filament_waiting_reasons: [reason] } } });
@@ -83,6 +122,7 @@ test('updated SDK follows persisted upload through create request and real job s
   await orders.submit(input); const snapshot = await orders.status(input.id);
   assert.deepEqual(events, ['POST /v1/print-jobs/create', `GET /v1/print-jobs/create-requests/${requestId}`, 'GET /v1/print-jobs/42']);
   assert.equal(snapshot.plates[0].status, 'created'); assert.equal(snapshot.plates[0].jobRead.job.status, 'QUEUED');
+  assert.deepEqual(snapshot.plates[0].job.print_options.filament_waiting_reasons, [reason]);
   assert.deepEqual(snapshot.plates[0].jobRead.job.filament_waiting_reasons, [reason]);
 });
 test('historical omitted wait policy keeps original outbound body and key after lost response', async t => {

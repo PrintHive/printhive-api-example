@@ -23,14 +23,24 @@ Each recording uses the actual packed SDK and actual sample backend against an o
 
 The full final exported durations were decoded and visually reviewed as 5 fps filmstrips, including each final segment. The rejection captures were repeated to bring their errors visibly into frame. No browser errors, cross-origin request violations or horizontal overflow were observed. All owned fixture servers and temporary order stores were removed after the run.
 
-The one-row waiting response is fixture-supplied data that the UI preserves. It does not prove the pending server change lists only unmet filaments, and no final cause-field behavior is claimed.
+The one-row waiting response in the earlier recording is fixture-supplied data. The consumer now supports the confirmed unmet-only/cause response, including bare hex colors, but those recordings do not yet demonstrate the added cause explanations. New contract tests exercise them; refreshed browser evidence and real server proof remain required.
 
 ## Review and remaining work
 
 Independent Sol reviews approved the SDK and consumer behavior. One existing limitation was documented: a denied live-job read stops automatic job polling, while a denied create-receipt read still follows the existing retry path.
 
-The normal Hive hook checks the simulator and SDK commit. This standalone repository has no configured commit hook or remote. No hook bypass, npm publication, public sample remote or merge is part of this update.
+The normal Hive hook checks the simulator and SDK commit. This standalone repository has no configured commit hook. Its approved public repository and origin now exist, but no sample source has been pushed. npm publication is approved only from main after the waiting-reason change merges; no npm release or merge has occurred.
 
-Final unmet-only waiting reasons, cause handling and the next SDK release version remain dependent on the separate delegate PR. Rebuild and repack after that contract lands, update both consumers and refresh the affected evidence.
+The final contract is confirmed: only unmet rows, optional `cause`, and an optional target suggestion for an explicit request target. The consumer supports it now. SDK 0.3.1 remains unpublished; preview it through the local workspace and include the separate live-job read method. Publication must wait for the waiting-reason PR to merge, then use main and run both Node versions against the published package. Refresh affected UI evidence before claiming the new cause presentation was visually verified.
 
 Docker did not answer the bounded local health check, so real isolated API/database/Cloud Slice and mock claim proof remains pending. See [the E2E plan](e2e-plan.md) for the three-of-four-loaded and claim-recheck scenarios. No real printer, live farm or lab Host was contacted, and no production order was submitted.
+
+## Confirmed waiting-reason contract preview
+
+The updated consumer was checked against unpublished SDK 0.3.1 in a local workspace. The integration preview uses the supplied waiting-reason head `89dd734fd4376111d89f1a233261effd14c280a9` plus the separate live-job read method. It is not a published package or a claim that those PRs are merged. The registry dependency and lockfile remain unchanged until publication.
+
+All 54 sample tests passed on Node 20.20.2 and Node 24.18.0; 33 simulator tests and its TypeScript check passed against the same workspace. The preview SDK passed normal build/drift/type checks and 64 tests, with one existing opt-in skip. An independent Sol round approved the final consumer and workspace changes; its documentation nit about the now-created public origin was corrected.
+
+New local recordings in ignored `data/waiting-shape-proof` cover desktop 1280 × 900 for 32.60 seconds and phone 390 × 844 for 31.28 seconds. Both full exported durations were decoded and reviewed as 5 fps filmstrips, including their final segments. They show only returned Source Slot 3, a bare-hex blue color rendered as a swatch, an empty-slot cause and explicit API target, unchanged raw JSON, and a fixture-supplied recheck snapshot for Source Slot 0 with a color-distance cause and no physical target. All four causes and missing/unknown-cause fallbacks have focused tests. No browser errors, cross-origin violations or horizontal overflow occurred.
+
+These recordings use an owned HTTP fixture through the actual SDK and backend. They do not prove real API/database/engine/claim behavior or production support. No source has been pushed to the approved public sample repository; the final registry-package tests on both Node versions remain pending.

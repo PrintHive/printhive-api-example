@@ -127,7 +127,7 @@ The print-order flow uses public print-job create, create-request polling, job r
 
 ## Follow a named-printer job through filament waiting
 
-See the [SDK adoption audit](docs/sdk-upgrade.md) and [isolated end-to-end test plan](docs/e2e-plan.md) for the release requirements, pending waiting-reason contract and mock-printer acceptance cases.
+See the [SDK adoption audit](docs/sdk-upgrade.md) and [isolated end-to-end test plan](docs/e2e-plan.md) for the release requirements, confirmed waiting-reason contract and mock-printer acceptance cases.
 
 Choose a 3MF, select one plate, confirm its source filaments and select their Hive material requirements. Enter the isolated mock printer's UUID under **Printer ID**. The sample sends the file and that selected plate through `hive.printJobs.create` to `POST /v1/print-jobs/create`, with typed `filaments`, `printer_id`, `release` and `on_filament_mismatch` fields.
 
@@ -139,7 +139,7 @@ The job panel renders API-reported `filament_waiting_reasons` with material, col
 
 For a named mock printer, expand **Optional placement on a named printer** on a source filament and enter both API AMS ID and API slot ID. These optional indices become that filament's `targetSlot` in the preview, durable intent and request. They do not come from its Source Slot. Leave both fields empty for Hive to resolve placement; clearing the printer removes hints from the outgoing request. API AMS IDs 254 and 255 accept only slot 0. Changing a pinned hint requires a new order ID.
 
-The finalized unmet-only reason list and additive cause field are pending a separate API change. The reason presentation is isolated so that contract can be adopted without rewriting order persistence. Current API reason lists may include requirements that already match; this sample does not guess which entries to remove.
+The confirmed response lists only unmet filaments at job creation and claim recheck. Each row can include `cause`: `slot_empty`, `missing_material`, `color_distance` or `slot_conflict`. The job panel explains recognized causes and keeps an absent or unknown cause readable. Response colors may be six hex digits with or without `#`; displayed swatches normalize them while the raw API JSON stays unchanged. The upcoming SDK 0.3.1 exports `FilamentWaitingReason`, but remains unpublished. Local preview builds may use the workspace client; public setup will use the npm release after the API change merges. Request fields and mismatch policy are unchanged.
 
 `on_filament_mismatch` belongs to immutable order intent. Replaying a saved order retains its policy, source bytes, catalog selections and idempotency key. Changing the policy under the same order ID conflicts. Historical orders without a stored policy retain their original omitted field, whose API default is wait.
 
@@ -218,17 +218,19 @@ These records describe saved slicing results. They can be absent, stale, or over
 
 The **Sync Printie filament catalog** panel is separate from print orders. It writes organization-owned catalog records through `hive.filamentCatalog.upsert`; read-back uses the same SDK’s `list` and `get` methods. The existing requirement search still reads the broader global and organization catalog.
 
-### Use the locally packed SDK
+### Use a local SDK before publication
 
-The registry dependency remains `@printhive/api@0.2.0`. That version supports the existing print flow but lacks `filamentCatalog`. Until the merged SDK 0.3.0 is published to npm, install its locally built package for this checkout:
+The registry dependency remains `@printhive/api@0.2.0` until the approved npm release is available. The waiting-reason branch declares unpublished 0.3.1 and exports `FilamentWaitingReason`. Development verification uses a built local integration workspace containing that contract plus the live-job read method. The live-job read method must also reach main before a released package can provide the complete example flow.
+
+Build the SDK with its normal build and drift checks, then link its workspace:
 
 ```sh
-npm run sdk:local -- /absolute/path/to/printhive-api-0.3.0.tgz
+npm run sdk:local -- /absolute/path/to/built/packages/api-client
 ```
 
-The helper runs `npm install --no-save --package-lock=false`, verifies the required methods without making a network request, and records the local package’s version/hash under ignored `data/sdk-local.json`. It does not publish anything or change the portable registry dependency/lockfile. Restart the example after installing. The page shows the loaded SDK version, local-package provenance when present, and actual method availability. Capability comes from `hive.filamentCatalog` methods, not a version guess or the marker.
+The same helper still accepts a packed `.tgz` file. It installs without saving a dependency or changing the lockfile. Workspace installation skips lifecycle scripts because the workspace must already be built. It verifies catalog methods without HTTP and records local provenance under ignored `data/sdk-local.json`; a workspace entry hash is not a hash of the complete bundle. The page shows the actual loaded version, workspace/package provenance and method availability. Workspace provenance is checked against the loaded package path, so a stale marker cannot mislabel a later registry install as a workspace.
 
-A clean `npm ci` restores the registry package. With an older SDK, catalog sync/read controls are unavailable, while print creation and existing requirement search remain available. Validation preview still works locally. There is no parallel REST fallback for catalog sync.
+Restart the example after installing. A clean `npm ci` restores the declared registry package. Older SDKs disable unavailable catalog/job-read controls; validation preview and existing creation remain available. No REST catalog-sync fallback is added. Publication remains gated on the waiting-reason PR merging; the final sample dependency will use the published npm version rather than this development link.
 
 ### Preview and sync catalog records
 
@@ -275,4 +277,4 @@ See [catalog sync verification](proof/catalog-sync/README.md) for the real SDK c
 
 A denied live job read stops automatic job polling. The existing create-receipt error path still retries on denied access; revoke/reload behavior there remains a follow-up.
 
-See [job-flow verification](docs/job-flow-verification.md) for local test results, labeled UI demos and the remaining real-stack and waiting-reason contract work.
+See [job-flow verification](docs/job-flow-verification.md) for local test results, labeled UI demos and the remaining real-stack and release work.

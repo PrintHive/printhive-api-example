@@ -124,7 +124,7 @@ $('sync-get').onclick = async () => {
 };
 api('/config').then((config) => {
   available = config.sdk?.capabilities?.filamentCatalog === true; production = config.production;
-  const source = config.sdk?.source === 'local-package' ? 'local package build, not an npm release' : 'installed package';
+  const source = config.sdk?.source === 'local-workspace' ? 'local workspace build, not an npm release' : config.sdk?.source === 'local-package' ? 'local package build, not an npm release' : 'installed package';
   $('sdk-info').textContent = `@printhive/api ${config.sdk?.version ?? 'unknown'} · ${source}`;
   $('sync-capability').textContent = available ? 'SDK catalog sync is available. Preview first; Sync writes to the displayed API destination.' : 'Catalog sync is unavailable in this installed SDK. Print-order creation and catalog requirement search remain available.';
   setBusy(false);
