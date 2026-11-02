@@ -1,0 +1,22 @@
+{
+  "sdk": "0.3.2",
+  "source": "npm registry",
+  "integrity": "sha512-PMMG5cL+9ocfBPgtw+1EwfY0LsNEByBewvelgpGDQ5p9KDdOhiM6EHMjezpn9kcHHpq37XsrzzLpr9WDG+LlTw==",
+  "moduleIsSymlink": false,
+  "versions": {
+    "v20.20.2": {
+      "buildAndTypes": "PASS",
+      "backendSecurityTests": 57,
+      "reactWorkflowTests": 3,
+      "esmImport": "PASS",
+      "commonjsImport": "PASS"
+    },
+    "v24.18.0": {
+      "buildAndTypes": "PASS",
+      "backendSecurityTests": 57,
+      "reactWorkflowTests": 3,
+      "esmImport": "PASS",
+      "commonjsImport": "PASS"
+    }
+  }
+}

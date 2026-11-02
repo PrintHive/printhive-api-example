@@ -1,0 +1,14 @@
+{
+  "version": "0.3.2",
+  "registry": "https://registry.npmjs.org",
+  "tarball": "https://registry.npmjs.org/@printhive/api/-/api-0.3.2.tgz",
+  "integrity": "sha512-PMMG5cL+9ocfBPgtw+1EwfY0LsNEByBewvelgpGDQ5p9KDdOhiM6EHMjezpn9kcHHpq37XsrzzLpr9WDG+LlTw==",
+  "sha1": "dd1caee110d6267e09bdec9254cba3cc431cb32e",
+  "sha256": "1a92c317ecc3927c4c2d1225825b394a08e1fac7a7f1456149f264ce923a2dde",
+  "moduleIsSymlink": false,
+  "proofTarballContentDifferences": [],
+  "publishSource": "2ccf812ad6adb9f16fcd6289ebad021dc97be109",
+  "sdkSourceByteIdentical": true,
+  "publishWorkflowRunId": 41478992801,
+  "testedSourceCommit": "84967559f80b29de10d3d2b4355091204682bf23"
+}

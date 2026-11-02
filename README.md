@@ -1,6 +1,6 @@
 # Create a Print Hive job from your backend
 
-This React, TypeScript, Vite and shadcn/ui sample accepts a commerce order, sends a project 3MF to PrintHive, and follows creation through live job status. A Node backend keeps the SDK and API credential on the server. It uses the published `@printhive/api@0.2.0` package from npm. A job represents one plate. An order with several plates sends one request per plate.
+This React, TypeScript, Vite and shadcn/ui sample accepts a commerce order, sends a project 3MF to PrintHive, and follows creation through live job status. A Node backend keeps the SDK and API credential on the server. It uses the published `@printhive/api@0.3.2` package from npm. A job represents one plate. An order with several plates sends one request per plate.
 
 The CLI and HTTP backend share the same durable order store. Your API key stays on the server. Job creation does not mean a printer has started or finished. Hive retains its readiness, bed-clear, material, and queue checks.
 
@@ -20,7 +20,7 @@ The [original local proof notes](proof/README.md) record a processing race found
    npm ls @printhive/api
    ```
 
-   Expect `@printhive/api@0.2.0`. The lockfile resolves the npm registry tarball, with no workspace links.
+   Expect `@printhive/api@0.3.2`. The lockfile resolves the npm registry tarball, with no workspace links.
 
 5. Set `PRINTHIVE_API_KEY` privately in your shell or server environment. Do not commit it or put it in browser code. Optionally set `PRINTHIVE_BASE_URL` to your own development API. The default is the SDK's public API. HTTP is accepted only for loopback development.
 
@@ -115,7 +115,7 @@ npm run send-print -- status ORDER_ID
 npm run send-print -- cancel ANOTHER_REQUEST_ID
 ```
 
-The backend exposes `POST /orders/{id}/{plate}/release` and `POST /orders/{id}/{plate}/cancel` for the same operations. These call HTTP directly because SDK 0.2.0 has no release or cancel helper. They require Control scope. Read the status after a lost control response before deciding whether to repeat the action. The wrapper does not automatically retry control calls.
+The backend exposes `POST /orders/{id}/{plate}/release` and `POST /orders/{id}/{plate}/cancel` for the same operations. These call HTTP directly because SDK 0.3.2 has no release or cancel helper. They require Control scope. Read the status after a lost control response before deciding whether to repeat the action. The wrapper does not automatically retry control calls.
 
 Release authorizes only a manual hold. It cannot approve an unrelated preparation hold. Cancel works before job creation. Once a job exists, use Hive's job cancellation workflow instead.
 
@@ -158,11 +158,11 @@ The job panel renders API-reported `filament_waiting_reasons` with material, col
 
 For a named mock printer, expand **Optional placement on a named printer** on a source filament and enter both API AMS ID and API slot ID. These optional indices become that filament's `targetSlot` in the preview, durable intent and request. They do not come from its Source Slot. Leave both fields empty for Hive to resolve placement; clearing the printer removes hints from the outgoing request. API AMS IDs 254 and 255 accept only slot 0. Changing a pinned hint requires a new order ID.
 
-The confirmed response lists only unmet filaments at job creation and claim recheck. Each row can include `cause`: `slot_empty`, `missing_material`, `color_distance` or `slot_conflict`. The job panel explains recognized causes and keeps an absent or unknown cause readable. Response colors may be six hex digits with or without `#`; displayed swatches normalize them while the raw API JSON stays unchanged. SDK 0.3.2 on main includes `FilamentWaitingReason` and live job reads, but is not yet published. Local preview builds may use the workspace client; public setup will pin the registry release after the real-stack proof and Node 20/24 registry-install tests pass. Request fields and mismatch policy are unchanged.
+The confirmed response lists only unmet filaments at job creation and claim recheck. Each row can include `cause`: `slot_empty`, `missing_material`, `color_distance` or `slot_conflict`. The job panel explains recognized causes and keeps an absent or unknown cause readable. Response colors may be six hex digits with or without `#`; displayed swatches normalize them while the raw API JSON stays unchanged. Published SDK 0.3.2 includes `FilamentWaitingReason` and live job reads. The manifest and lockfile pin the npm registry package, verified on Node 20 and 24 after the real-stack proof. Request fields and mismatch policy are unchanged.
 
 `on_filament_mismatch` belongs to immutable order intent. Replaying a saved order retains its policy, source bytes, catalog selections and idempotency key. Changing the policy under the same order ID conflicts. Historical orders without a stored policy retain their original omitted field, whose API default is wait.
 
-The npm dependency remains 0.2.0 until the approved 0.3.2 release is published and verified. Install a locally packed SDK build containing `printJobs.get` for complete job following. The configuration response reports that method's availability. An older SDK shows an explicit unavailable message instead of silently adding another HTTP client.
+The npm dependency pins published SDK 0.3.2, including `printJobs.get` for complete job following. The configuration response reports that method's availability. An older SDK shows an explicit unavailable message instead of silently adding another HTTP client.
 
 All automated job writes and claim checks must use the owned isolated API, real database and Cloud Slice with mock printers. The live sample's configured production API is not a writable test fixture. Production may return `plate_selection_host_update_required` until its Host supports plate selection; the sample displays that admission result rather than bypassing it.
 
@@ -228,7 +228,7 @@ The public job API currently accepts `filaments: [{ sourceSlot, material, color,
 
 The example sends no `targetSlot`. When no printer is specified, Smart Queue determines the physical material routing later. Explicit printer selection retains the same requirement payload and still undergoes Hive’s qualification and readiness checks.
 
-SDK 0.2.0 has no catalog methods. The backend therefore uses a thin authenticated read-only adapter for `GET /v1/materials` and `GET /v1/materials/:id`. The browser talks only to the local `/catalog` proxy, which returns selected public catalog fields and never the API key. Search text is limited to 100 characters and paginated in pages of 20. The preview endpoint performs catalog reads only. Existing CLI callers can continue supplying typed filament requirements directly.
+SDK catalog-sync methods are distinct from broad Material requirement search. The backend uses a thin authenticated read-only adapter for `GET /v1/materials` and `GET /v1/materials/:id`. The browser talks only to the local `/catalog` proxy, which returns selected public catalog fields and never the API key. Search text is limited to 100 characters and paginated in pages of 20. The preview endpoint performs catalog reads only. Existing CLI callers can continue supplying typed filament requirements directly.
 
 The HTTP mapped-order form adds `projectData` and `mappings: [{ sourceSlot, materialId }]` alongside its existing single selected plate. The backend verifies complete mappings, binds the source filename and hash, resolves the selected catalog entries, then calls the SDK with only the supported fields. Original source metadata and chosen catalog records remain part of immutable order intent, so a changed mapping conflicts with the same order ID.
 
@@ -249,7 +249,7 @@ The **Sync Printie filament catalog** panel is separate from print orders. It wr
 
 ### Use a local SDK before publication
 
-The registry dependency remains `@printhive/api@0.2.0` until the approved npm release is available. The waiting-reason branch declares unpublished 0.3.1 and exports `FilamentWaitingReason`. Development verification uses a built local integration workspace containing that contract plus the live-job read method. The live-job read method must also reach main before a released package can provide the complete example flow.
+The registry dependency is `@printhive/api@0.3.2`. Normal setup uses the registry package with live job reads, waiting-reason types and catalog-sync methods; no workspace link is required.
 
 Build the SDK with its normal build and drift checks, then link its workspace:
 
@@ -259,7 +259,7 @@ npm run sdk:local -- /absolute/path/to/built/packages/api-client
 
 The same helper still accepts a packed `.tgz` file. It installs without saving a dependency or changing the lockfile. Workspace installation skips lifecycle scripts because the workspace must already be built. It verifies catalog methods without HTTP and records local provenance under ignored `data/sdk-local.json`; a workspace entry hash is not a hash of the complete bundle. The page shows the actual loaded version, workspace/package provenance and method availability. Workspace provenance is checked against the loaded package path, so a stale marker cannot mislabel a later registry install as a workspace.
 
-Restart the example after installing. A clean `npm ci` restores the declared registry package. Older SDKs disable unavailable catalog/job-read controls; validation preview and existing creation remain available. No REST catalog-sync fallback is added. Publication remains gated on the waiting-reason PR merging; the final sample dependency will use the published npm version rather than this development link.
+Restart the example after installing. A clean `npm ci` restores the declared registry package. Older SDKs disable unavailable catalog/job-read controls; validation preview and existing creation remain available. No REST catalog-sync fallback is added. Public setup uses the pinned registry release; this helper is only for SDK development.
 
 ### Preview and sync catalog records
 
@@ -316,6 +316,6 @@ npm test
 npm run test:ui
 ```
 
-Backend tests cover real local HTTP serving, upload limits, preserved order intent, SDK adapters and private-file protection. React tests exercise requirement selection, request previews and immutable retries. The browser demo uses the built React app, actual SDK and Node backend against an explicitly labeled owned HTTP fixture; it covers uploaded plate selection, four filament mappings, manual release, live waiting reasons, rejection and catalog sync. These checks do not establish real Cloud Slice slicing, printer claims or physical printing. The separate real-stack release proof must pass before publishing the SDK and sample.
+Backend tests cover real local HTTP serving, upload limits, preserved order intent, SDK adapters and private-file protection. React tests exercise requirement selection, request previews and immutable retries. The browser demo uses the built React app, actual SDK and Node backend against an explicitly labeled owned HTTP fixture; it covers uploaded plate selection, four filament mappings, manual release, live waiting reasons, rejection and catalog sync. These checks do not establish real Cloud Slice slicing, printer claims or physical printing. The separate real-stack release proof passed; its scope, identities and sanitized transcript are in [proof/release-0.3.2](proof/release-0.3.2/README.md). It covers real slicing, job creation, unmet-only waiting reasons and normal mock-printer claim refusal/success, without physical printing.
 
-The shipped app has no mock API mode. Its destination and SDK source are shown in the page. Credentials stay in the Node process; never put them in a `VITE_` environment variable. Use `npm run sdk:local` only for an explicitly local SDK build until the approved npm release is available.
+The shipped app has no mock API mode. Its destination and SDK source are shown in the page. Credentials stay in the Node process; never put them in a `VITE_` environment variable. Use `npm run sdk:local` only when intentionally testing SDK development; `npm ci` restores the pinned registry release.

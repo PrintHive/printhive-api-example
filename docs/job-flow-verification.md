@@ -68,3 +68,11 @@ Browser discovery and rehearsal preceded five recorded scenarios through the bui
 - Asynchronous rejection, 5.62 seconds: the failed receipt retains the nested admission error and does not invent a job.
 
 Recordings and sanitized HTTP-fixture evidence are retained locally under ignored `data/react-migration-proof/`. They demonstrate migration behavior, not real slicing, persistence, claim or physical-print qualification. The separately approved main-849 real-stack proof gates npm publication and the public source push. No production submission, release or printer action was used to verify this migration.
+
+## Published SDK 0.3.2 verification
+
+The release proof subsequently passed against unchanged main source `84967559f80b29de10d3d2b4355091204682bf23`, using the actual packed SDK, local API, real database/Storage, Cloud Slice, Bambu engine and output worker. Selected plate 2 produced a queued job with four PETG requirements. Three SDK job polls showed only Source Slot 3 missing. A normal mock claim returned no job until the fourth filament/loadout and fresh telemetry were supplied, then claimed that same job. No Host process, G-code sender or physical printer was involved.
+
+The published npm 0.3.2 tarball is byte-identical to the tested proof tarball. The sample manifest and lockfile now pin that registry release. A clean registry install passed build/typechecks, 57 backend/security tests, three React workflow tests and ESM/CommonJS imports on both Node 20.20.2 and Node 24.18.0. The local preview recordings above remain UI evidence for the same behavior, distinct from this real-stack proof.
+
+See [release proof](../proof/release-0.3.2/README.md), [registry identity](../proof/release-0.3.2/registry.json) and [registry test results](../proof/release-0.3.2/registry-tests.json). The real-stack run did not separately exercise reject mode or physical printing. Stock-profile expansion beyond the qualified plain PETG P1S target remains separate work.

@@ -1,6 +1,6 @@
 # Partner SDK upgrade from npm 0.2.0
 
-This audit compares the actual npm `@printhive/api@0.2.0` tarball with SDK source on main at `558fc36f8b31331137d2353caaefee5737dcaa39`. Main declares 0.3.0; that declaration does not establish an npm release. The sample's package manifest and lockfile still pin 0.2.0. Its development installation previously used a locally packed 0.3.0 build.
+This audit compares npm SDK 0.2.0 with published 0.3.2, now pinned by this sample. The release includes preparation/catalog support, unmet-only waiting reasons and live job reads. Registry-install checks on Node 20 and 24 are recorded with the real-stack proof under `proof/release-0.3.2/`.
 
 ## Already available in 0.2.0
 
@@ -20,7 +20,7 @@ Partners do not need a new SDK release to send these existing inputs:
 | `preparations.create`            | Canonical `items`, explicit source references, `materialMappings`, selected plates, quantity and `target.printerId`; optional supplied idempotency key and abort signal. Inputs are validated before HTTP, including the 20-item limit.           |
 | `preparations.get`               | Read the immutable preparation and per-plate ready/held/failed state.                                                                                                                                                                             |
 | `preparations.waitUntilSettled`  | A bounded total polling deadline with cancellation; inspect ready, held and failed outcomes explicitly.                                                                                                                                           |
-| `preparations.downloadInfo`          | Retrieve signed download metadata for a ready plate, then check URL policy, expiry and expected hash before consuming bytes. This is metadata, not automatic arbitrary-URL downloading.                                                           |
+| `preparations.downloadInfo`      | Retrieve signed download metadata for a ready plate, then check URL policy, expiry and expected hash before consuming bytes. This is metadata, not automatic arbitrary-URL downloading.                                                           |
 | Preparation types and validators | New public input, item, mapping, prepared-plate, download and target-refusal types come from the API contracts. Existing source/model/printer/create signatures remain compatible.                                                                |
 | `PrintHiveApiError.reasons`      | Typed target-refusal reasons for `target_not_qualified`. Other errors retain their body and existing fields; this getter does not describe every API failure.                                                                                     |
 | Retry change                     | `503 preparation_disabled` stops immediately rather than retrying as a transient outage. Other bounded retry rules remain.                                                                                                                        |
@@ -38,12 +38,12 @@ The catalog types describe Material identity; a source/project filament, physica
 - Claim rechecks current material routes. A spool swap can make a previously eligible job wait again. A queued job or empty waiting-reason list is not physical readiness or successful execution.
 - Production still depends on a Host that supports plate selection. `plate_selection_host_update_required` is a capability hold, not a successful E2E result. Verification uses mock printers and no lab Host.
 
-## New release required by this update
+## Adopt SDK 0.3.2
 
-1. Add a typed `printJobs.get(jobId, signal?)` method for `GET /v1/print-jobs/{id}`. Validate the response and return the inner job, distinct from the create receipt. Include the canonical job waiting-reason types in the generated snapshot and declarations.
-2. Integrate the separate waiting-reason change after it merges. The confirmed response contains only unmet filaments at create and claim, with optional `cause`: `slot_empty`, `missing_material`, `color_distance` or `slot_conflict`. Colors may omit `#`; a physical suggestion is present only when the request supplied `targetSlot`. The unpublished 0.3.1 SDK generates this response and exports `FilamentWaitingReason`. Request inputs do not change.
-3. Include all existing 0.3.0 preparation/catalog additions and document the retry change. Export the job snapshot and waiting-reason types, with normal drift/build/type/runtime tests and packed ESM/CommonJS consumer checks.
-4. Keep the waiting-reason owner's 0.3.1 version decision and update release notes. The branch alone does not provide the live-job read method; the preview must also include that method. Until publication, use an explicitly identified local workspace or packed build and show its actual version/capabilities in the example.
-5. Jerrod approved npm publication from main after the waiting-reason PR merges, and approved the public example repository. Publish only when those conditions hold, verify the registry artifact, update the sample manifest and lockfile to it, and rerun Node 20 and 24 tests against that published package. This does not authorize merging another PR.
+1. Install the exact registry release with `npm ci` from this sample.
+2. Use `printJobs.get(jobId, signal?)` after creation to read live status. Its return value is the inner job, distinct from the immutable creation receipt.
+3. Render only the returned unmet rows. `FilamentWaitingReason` includes optional `cause`: `slot_empty`, `missing_material`, `color_distance` or `slot_conflict`. Colors may omit `#`. Physical suggestions require an explicit request `targetSlot`.
+4. Keep causes advisory: a material-type mismatch can still report `color_distance`. Recheck readings for `material_route_changed`; an explicit slot conflict needs an assignment change, while an unhinted conflict may need another matching spool.
+5. Preserve existing server qualification boundaries. Catalog availability does not qualify a slicing profile, printer, nozzle or build surface.
 
-Release/cancel remain thin backend HTTP helpers because the SDK has no such methods. Broad Material search likewise remains an existing backend adapter. These are recorded SDK ergonomics gaps, not prerequisites for the named-printer wait/reject path. Publication remains gated on the approved main-branch release conditions; the local preview does not establish an npm release.
+Release/cancel remain thin backend HTTP helpers because this SDK has no such methods. Broad Material requirement search remains a backend read adapter, separate from SDK catalog sync. These limitations are not hidden by fallback SDK calls. The real-stack proof covers the plain PETG P1S 0.4 path; it does not establish support for every Bambu material profile or physical print quality.
