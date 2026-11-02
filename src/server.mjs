@@ -1,3 +1,4 @@
+import { serveWebAsset } from "./web-assets.mjs";
 import { createCatalogSync, catalogSyncError } from "./catalog-sync.mjs";
 import { sdkInfo } from "./sdk-info.mjs";
 import { inspectProject } from "./project-inspection.mjs";
@@ -13,16 +14,7 @@ import { clientFromEnv } from "./client.mjs";
 import { createOrders, validateOrder } from "./orders.mjs";
 
 export const MAX_UPLOAD_BYTES = 16 * 1024 * 1024;
-const publicDir = fileURLToPath(new URL("../public/", import.meta.url));
-const assets = new Map([
-  ["/", ["index.html", "text/html; charset=utf-8"]],
-  ["/app.js", ["app.js", "text/javascript; charset=utf-8"]],
-  ["/catalog-sync.js", ["catalog-sync.js", "text/javascript; charset=utf-8"]],
-  ["/colors.mjs", ["colors.mjs", "text/javascript; charset=utf-8"]],
-  ["/project-data.mjs", ["../src/project-data.mjs", "text/javascript; charset=utf-8"]],
-  ["/job-status.mjs", ["../src/job-status.mjs", "text/javascript; charset=utf-8"]],
-  ["/style.css", ["style.css", "text/css; charset=utf-8"]],
-]);
+const builtFrontend = fileURLToPath(new URL("../dist/", import.meta.url));
 
 async function readBody(req, limit) {
   const chunks = [];
@@ -35,7 +27,7 @@ async function readBody(req, limit) {
   return Buffer.concat(chunks);
 }
 
-export function createOrderServer({ hive, control, catalog, directory = "data", designs = "fixtures", baseUrl = "https://api.printhiv3d.com" }) {
+export function createOrderServer({ hive, control, catalog, directory = "data", designs = "fixtures", baseUrl = "https://api.printhiv3d.com", frontendDirectory = builtFrontend }) {
   const orders = createOrders(hive, directory, undefined, catalog);
   const sync = createCatalogSync(hive);
   designs = resolve(designs);
@@ -52,16 +44,7 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
     try {
       const pathname = new URL(req.url, "http://localhost").pathname;
       const parts = pathname.split("/").filter(Boolean).map(decodeURIComponent);
-      if (req.method === "GET" && assets.has(pathname)) {
-        const [file, type] = assets.get(pathname);
-        const bytes = await readFile(join(publicDir, file));
-        res.writeHead(200, {
-          "content-type": type,
-          "x-content-type-options": "nosniff",
-          "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
-        });
-        return res.end(bytes);
-      }
+      if (req.method === "GET" && await serveWebAsset(pathname, res, frontendDirectory)) return;
       if (pathname.startsWith("/catalog-sync/")) {
         try {
           if (req.method === "POST" && ["/catalog-sync/preview", "/catalog-sync/upsert"].includes(pathname)) {

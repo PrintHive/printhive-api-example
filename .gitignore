@@ -20,3 +20,7 @@ proof/catalog-sync/*.webm
 proof/catalog-sync/*-results.json
 proof/catalog-sync/production.json
 !proof/catalog-sync/contract.log
+
+dist/
+.vite/
+coverage/

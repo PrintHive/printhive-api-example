@@ -52,3 +52,19 @@ The latest coordination notes corrected two operator instructions. Explicit slot
 The final focused recordings in ignored `data/waiting-guidance-proof` supersede the earlier cause-wording capture for guidance. Desktop is 25.48 seconds and phone is 25.40 seconds. Rehearsal passed first; both full exported durations were decoded and reviewed as 5 fps filmstrips. They show the explicit conflict/assignment remedy, unhinted conflict/additional-spool remedy, uncertain-reading recheck, advisory material-or-color mismatch and cleared waiting state. Each frame remains labeled HTTP fixture. No new real API/database/engine or claim proof is implied.
 
 All 56 sample tests passed on both Node 20.20.2 and Node 24.18.0 against the unpublished 0.3.1 workspace. The targeted guidance regressions failed before the fix and passed afterward. A second independent Sol round approved the correction. Docker's normal and supported forced restarts did not restore the engine; its startup and local diagnostics timed out. No data reset or diagnostics upload was performed. The registry-package publication tests remain pending the main-branch release.
+
+## React, Vite and shadcn migration
+
+The sample frontend now uses React and TypeScript, built by Vite, with official shadcn Radix Nova components and PrintHive theme tokens. The Node backend retains its SDK credentials, API adapters and durable order store. Production serving exposes only the compiled frontend assets. Development serves `client/` with an explicit file allowlist; a red/green HTTP regression proves saved orders/uploads and backend-only modules are refused.
+
+Local migration verification passed on Node 20.20.2 and Node 24.18.0: frontend build/typecheck, 57 backend/security tests and three React workflow tests. These runs use the existing local SDK preview, not the eventual npm registry artifact.
+
+Browser discovery and rehearsal preceded five recorded scenarios through the built React app, actual SDK and Node backend against an owned HTTP fixture. The entire exported recordings were reviewed using five-frame-per-second filmstrips, including final states:
+
+- Desktop, 63.50 seconds: uploaded three-plate project, plate 2, four explicit source requirements, physical hint for source 3, preview, manual hold/release, live unmet-only waiting reason and refreshed completion.
+- Phone, 44.75 seconds at 390 × 844 CSS pixels: the same selected-plate/mapping/manual-release flow and readable source-3 waiting instruction.
+- Catalog, 7.27 seconds: validation preview, explicit SDK upsert, list and read of the stable catalog identity.
+- Immediate rejection, 5.19 seconds: HTTP 422 stays an error without a created job.
+- Asynchronous rejection, 5.62 seconds: the failed receipt retains the nested admission error and does not invent a job.
+
+Recordings and sanitized HTTP-fixture evidence are retained locally under ignored `data/react-migration-proof/`. They demonstrate migration behavior, not real slicing, persistence, claim or physical-print qualification. The separately approved main-849 real-stack proof gates npm publication and the public source push. No production submission, release or printer action was used to verify this migration.

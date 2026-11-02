@@ -1,0 +1,485 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { z } from "zod";
+import {
+  validateMappedInput,
+  validateProjectData,
+} from "../../src/project-data.mjs";
+import { shouldPollJob } from "../../src/job-status.mjs";
+import {
+  acceptedSchema,
+  api,
+  configSchema,
+  extractionSchema,
+  json,
+  message,
+  orderSchema,
+  plateSchema,
+  previewSchema,
+  projectSchema,
+  type Config,
+  type Extraction,
+  type Hint,
+  type MappedInput,
+  type Material,
+  type Order,
+  type Plate,
+  type Project,
+} from "./api";
+
+type Active = { id: string; plate: number; options: RequestInit | null };
+export function useOrderWorkflow() {
+  const [config, setConfig] = useState<Config | null>(null);
+  const [bundled, setBundled] = useState<Project | null>(null);
+  const [project, setProject] = useState<Project | null>(null);
+  const [extracted, setExtracted] = useState<Extraction | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [plateNumber, setPlateNumber] = useState(1);
+  const [confirmed, setConfirmed] = useState<Record<number, Plate>>({});
+  const [drafts, setDrafts] = useState<Record<number, number[]>>({});
+  const [showAll, setShowAll] = useState<Record<number, boolean>>({});
+  const [selections, setSelections] = useState<
+    Record<number, Record<number, Material>>
+  >({});
+  const [hints, setHints] = useState<Record<number, Record<number, Hint>>>({});
+  const [printer, setPrinter] = useState("");
+  const [release, setRelease] = useState("manual");
+  const [policy, setPolicy] = useState("wait");
+  const [manifest, setManifest] = useState("");
+  const [projectError, setProjectError] = useState("");
+  const [extracting, setExtracting] = useState(false);
+  const [active, setActive] = useState<Active | null>(null);
+  const activeRef = useRef<Active | null>(null);
+  const [order, setOrder] = useState<Order | null>(null);
+  const [busy, setBusy] = useState(false);
+  const locked = useRef(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
+  const [payload, setPayload] = useState<unknown>(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const sourceMode = useRef<"bundled" | "file" | "manual">("bundled");
+  const sourceGeneration = useRef(0),
+    previewGeneration = useRef(0),
+    pollGeneration = useRef(0);
+  const extractionController = useRef<AbortController | null>(null);
+  const pollController = useRef<AbortController | null>(null);
+  const previewController = useRef<AbortController | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const mounted = useRef(true);
+  const currentPlate = extracted
+    ? confirmed[plateNumber]
+    : project?.plates.find((p) => p.number === plateNumber);
+  const currentSelections = selections[plateNumber] ?? {};
+  const complete = Boolean(
+    currentPlate?.filaments.length &&
+    currentPlate.filaments.every((f) => currentSelections[f.sourceSlot]),
+  );
+  const currentUsage = extracted?.plates.find(
+    (p) => p.number === plateNumber,
+  )?.usage;
+  const draft =
+    drafts[plateNumber] ??
+    (currentUsage?.kind === "detected" ? (currentUsage.sourceSlots ?? []) : []);
+  const invalidate = useCallback(() => {
+    previewGeneration.current++;
+    previewController.current?.abort();
+    setPayload(null);
+    setPreviewBusy(false);
+  }, []);
+  const clearProject = useCallback(() => {
+    sourceGeneration.current++;
+    extractionController.current?.abort();
+    setProject(null);
+    setExtracted(null);
+    setConfirmed({});
+    setDrafts({});
+    setShowAll({});
+    setSelections({});
+    setHints({});
+    setProjectError("");
+    invalidate();
+  }, [invalidate]);
+  const installProject = useCallback((value: Project) => {
+    setProject(value);
+    setExtracted(null);
+    setPlateNumber(value.plates[0]?.number ?? 1);
+    setManifest(JSON.stringify({ plates: value.plates }, null, 2));
+  }, []);
+  useEffect(() => {
+    mounted.current = true;
+    const controller = new AbortController();
+    Promise.all([
+      api("/config", configSchema, { signal: controller.signal }),
+      api("/project-data", projectSchema, { signal: controller.signal }),
+    ])
+      .then(([destination, data]) => {
+        if (controller.signal.aborted) return;
+        setConfig(destination);
+        setBundled(data);
+        if (sourceMode.current === "bundled") installProject(data);
+      })
+      .catch((e) => {
+        if (!controller.signal.aborted) setError(message(e));
+      });
+    return () => {
+      mounted.current = false;
+      controller.abort();
+      extractionController.current?.abort();
+      pollController.current?.abort();
+      previewController.current?.abort();
+      previewGeneration.current++;
+      clearTimeout(timer.current);
+      pollGeneration.current++;
+    };
+  }, [installProject]);
+  async function selectFile(value: File | null) {
+    if (activeRef.current || locked.current) return;
+    sourceMode.current = value ? "file" : "bundled";
+    clearProject();
+    setFile(value);
+    setManifest("");
+    if (!value) {
+      setExtracting(false);
+      if (bundled) installProject(bundled);
+      return;
+    }
+    const generation = sourceGeneration.current;
+    const controller = new AbortController();
+    extractionController.current = controller;
+    setExtracting(true);
+    try {
+      if (!/\.3mf$/i.test(value.name) || !value.size)
+        throw new Error("Choose a nonempty .3mf project");
+      if (value.size > 16 * 1024 * 1024 - 65536)
+        throw new Error("Choose a 3MF smaller than 16 MiB including form data");
+      const body = new FormData();
+      body.set("file", value);
+      const data = await api("/project-data/inspect", extractionSchema, {
+        method: "POST",
+        body,
+        signal: controller.signal,
+      });
+      if (generation !== sourceGeneration.current || controller.signal.aborted)
+        return;
+      setExtracted(data);
+      setProject({ filename: data.filename, sha256: data.sha256, plates: [] });
+      setPlateNumber(data.plates[0]?.number ?? 1);
+    } catch (e) {
+      if (!controller.signal.aborted && generation === sourceGeneration.current)
+        setProjectError(message(e));
+    } finally {
+      if (generation === sourceGeneration.current) setExtracting(false);
+    }
+  }
+  function editManifest(text: string) {
+    sourceMode.current = "manual";
+    clearProject();
+    setExtracting(false);
+    setManifest(text);
+  }
+  async function applyManifest(text = manifest) {
+    sourceMode.current = "manual";
+    clearProject();
+    const generation = sourceGeneration.current;
+    try {
+      const validated = validateProjectData(JSON.parse(text));
+      if (!file && !bundled) throw new Error("Project data is not ready");
+      const hash = file
+        ? [
+            ...new Uint8Array(
+              await crypto.subtle.digest("SHA-256", await file.arrayBuffer()),
+            ),
+          ]
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("")
+        : bundled?.sha256;
+      if (generation !== sourceGeneration.current) return;
+      installProject(
+        projectSchema.parse({
+          ...validated,
+          filename: file?.name ?? bundled?.filename,
+          sha256: hash,
+        }),
+      );
+    } catch (e) {
+      if (generation === sourceGeneration.current) setProjectError(message(e));
+    }
+  }
+  async function importManifest(value: File | null) {
+    if (!value || activeRef.current || locked.current) return;
+    const generation = sourceGeneration.current;
+    try {
+      if (value.size > 65536)
+        throw new Error("Project data JSON must be smaller than 64 KiB");
+      const text = await value.text();
+      if (generation !== sourceGeneration.current || !mounted.current) return;
+      editManifest(text);
+      await applyManifest(text);
+    } catch (e) {
+      if (generation === sourceGeneration.current) setProjectError(message(e));
+    }
+  }
+  function changeUsage(slot: number, checked: boolean) {
+    setDrafts((d) => ({
+      ...d,
+      [plateNumber]: checked
+        ? [...new Set([...draft, slot])]
+        : draft.filter((s) => s !== slot),
+    }));
+    setConfirmed((p) => {
+      const next = { ...p };
+      delete next[plateNumber];
+      return next;
+    });
+    setSelections((p) => ({ ...p, [plateNumber]: {} }));
+    invalidate();
+  }
+  function confirmUsage() {
+    if (!extracted || !draft.length) return;
+    const values = extracted.palette.filter((f) =>
+      draft.includes(f.sourceSlot),
+    );
+    if (values.length !== draft.length || values.some((f) => !f.selectable))
+      return;
+    const plate = plateSchema.parse({ number: plateNumber, filaments: values });
+    setConfirmed((p) => ({ ...p, [plateNumber]: plate }));
+    setSelections((p) => ({ ...p, [plateNumber]: {} }));
+    setHints((p) => ({ ...p, [plateNumber]: {} }));
+    invalidate();
+  }
+  function currentInput(): MappedInput {
+    if (!project || !currentPlate || !complete)
+      throw new Error("Choose a Hive requirement for every source filament");
+    const input: MappedInput = {
+      id: `browser-${crypto.randomUUID()}`,
+      plates: [plateNumber],
+      projectData: {
+        filename: project.filename,
+        sha256: project.sha256,
+        plates: [currentPlate],
+      },
+      mappings: currentPlate.filaments.map((f) => {
+        const selected = currentSelections[f.sourceSlot];
+        if (!selected) throw new Error("Select every filament requirement");
+        const hint = printer.trim()
+          ? hints[plateNumber]?.[f.sourceSlot]
+          : undefined;
+        if (hint && (hint.ams === "") !== (hint.slot === ""))
+          throw new Error(
+            `Source slot ${f.sourceSlot}: enter both placement indices or leave both empty`,
+          );
+        return {
+          sourceSlot: f.sourceSlot,
+          materialId: selected.id,
+          ...(hint && hint.ams !== "" && hint.slot !== ""
+            ? {
+                targetSlot: {
+                  ams_id: Number(hint.ams),
+                  slot_id: Number(hint.slot),
+                },
+              }
+            : {}),
+        };
+      }),
+      release,
+      on_filament_mismatch: policy,
+      ...(printer.trim() ? { printer_id: printer.trim() } : {}),
+    };
+    validateMappedInput(input);
+    return input;
+  }
+  async function preview() {
+    const version = ++previewGeneration.current;
+    previewController.current?.abort();
+    const controller = new AbortController();
+    previewController.current = controller;
+    setPreviewBusy(true);
+    try {
+      const input = currentInput();
+      const result = await api("/orders/preview", previewSchema, {
+        ...json(input),
+        signal: controller.signal,
+      });
+      if (version === previewGeneration.current)
+        setPayload({
+          ...result,
+          release: input.release,
+          on_filament_mismatch: input.on_filament_mismatch,
+          ...(input.printer_id ? { printer_id: input.printer_id } : {}),
+        });
+    } catch (e) {
+      if (version === previewGeneration.current)
+        setPayload({ error: message(e) });
+    } finally {
+      if (version === previewGeneration.current) setPreviewBusy(false);
+    }
+  }
+  const refresh = useCallback(async () => {
+    const current = activeRef.current;
+    if (!current) return;
+    const generation = ++pollGeneration.current;
+    clearTimeout(timer.current);
+    pollController.current?.abort();
+    const controller = new AbortController();
+    pollController.current = controller;
+    try {
+      const value = await api(
+        `/orders/${encodeURIComponent(current.id)}`,
+        orderSchema,
+        { signal: controller.signal },
+      );
+      if (!mounted.current || generation !== pollGeneration.current) return;
+      setOrder(value);
+      setError("");
+      const receipt = value.plates[0];
+      if (
+        receipt &&
+        (!["created", "failed", "cancelled"].includes(receipt.status) ||
+          shouldPollJob(receipt.jobRead))
+      )
+        timer.current = setTimeout(() => {
+          void refresh();
+        }, 1000);
+    } catch (e) {
+      if (
+        !controller.signal.aborted &&
+        mounted.current &&
+        generation === pollGeneration.current
+      ) {
+        setError(`${message(e)}. Status is unknown. Polling will retry.`);
+        timer.current = setTimeout(() => {
+          void refresh();
+        }, 3000);
+      }
+    }
+  }, []);
+  async function submit() {
+    if (locked.current || !config) return;
+    locked.current = true;
+    setBusy(true);
+    setError("");
+    clearTimeout(timer.current);
+    try {
+      let current = activeRef.current;
+      if (!current) {
+        const input = currentInput();
+        let options: RequestInit;
+        if (file) {
+          const body = new FormData();
+          body.set("order", JSON.stringify(input));
+          body.set("file", file);
+          options = { method: "POST", body };
+        } else options = json({ ...input, file: "cube.3mf" });
+        current = { id: input.id, plate: plateNumber, options };
+        activeRef.current = current;
+        setActive(current);
+      }
+      if (!current.options) return;
+      await api("/orders", acceptedSchema, current.options);
+      current.options = null;
+      setSubmitted(true);
+      await refresh();
+    } catch (e) {
+      setError(
+        `${message(e)}${activeRef.current ? ". Retry preserves this order ID. Reload to change the input." : ""}`,
+      );
+    } finally {
+      locked.current = false;
+      setBusy(false);
+    }
+  }
+  async function action(kind: "release" | "cancel") {
+    const current = activeRef.current;
+    if (!current || locked.current) return;
+    locked.current = true;
+    setBusy(true);
+    clearTimeout(timer.current);
+    let failure = "";
+    try {
+      await api(
+        `/orders/${encodeURIComponent(current.id)}/${current.plate}/${kind}`,
+        receiptSchemaForAction,
+        { method: "POST" },
+      );
+    } catch (e) {
+      failure = `${message(e)}. Status refreshed; check before retrying this action.`;
+    } finally {
+      locked.current = false;
+      setBusy(false);
+      await refresh();
+      if (failure) setError(failure);
+    }
+  }
+  return {
+    config,
+    project,
+    extracted,
+    file,
+    plateNumber,
+    currentPlate,
+    confirmed,
+    draft,
+    currentUsage,
+    showAll: Boolean(showAll[plateNumber]),
+    setShowAll: (value: boolean) =>
+      setShowAll((p) => ({ ...p, [plateNumber]: value })),
+    selections: currentSelections,
+    hints: hints[plateNumber] ?? {},
+    printer,
+    release,
+    policy,
+    manifest,
+    projectError,
+    extracting,
+    active,
+    order,
+    busy,
+    submitted,
+    error,
+    payload,
+    previewBusy,
+    complete,
+    selectFile,
+    editManifest,
+    applyManifest,
+    importManifest,
+    changeUsage,
+    confirmUsage,
+    preview,
+    submit,
+    action,
+    refresh,
+    setPlate: (number: number) => {
+      setPlateNumber(number);
+      invalidate();
+    },
+    setPrinter: (value: string) => {
+      setPrinter(value);
+      invalidate();
+    },
+    setRelease: (value: string) => {
+      setRelease(value);
+      invalidate();
+    },
+    setPolicy: (value: string) => {
+      setPolicy(value);
+      invalidate();
+    },
+    choose: (slot: number, material: Material) => {
+      setSelections((p) => ({
+        ...p,
+        [plateNumber]: { ...p[plateNumber], [slot]: material },
+      }));
+      invalidate();
+    },
+    setHint: (slot: number, hint: Hint) => {
+      setHints((p) => ({
+        ...p,
+        [plateNumber]: { ...p[plateNumber], [slot]: hint },
+      }));
+      invalidate();
+    },
+    newOrder: () => window.location.reload(),
+  };
+}
+const receiptSchemaForAction = z.unknown();
+export type OrderWorkflow = ReturnType<typeof useOrderWorkflow>;

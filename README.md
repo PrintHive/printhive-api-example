@@ -1,6 +1,6 @@
 # Create a Print Hive job from your backend
 
-This sample accepts a commerce order, sends a project 3MF to Print Hive, and follows creation until Hive returns a job. It uses the published `@printhive/api@0.2.0` package from npm. A job represents one plate. An order with several plates sends one request per plate.
+This React, TypeScript, Vite and shadcn/ui sample accepts a commerce order, sends a project 3MF to PrintHive, and follows creation through live job status. A Node backend keeps the SDK and API credential on the server. It uses the published `@printhive/api@0.2.0` package from npm. A job represents one plate. An order with several plates sends one request per plate.
 
 The CLI and HTTP backend share the same durable order store. Your API key stays on the server. Job creation does not mean a printer has started or finished. Hive retains its readiness, bed-clear, material, and queue checks.
 
@@ -52,7 +52,26 @@ Run the same command after a network failure or restart. The store retains one k
 
 `data/` contains the store and source copies. Keep this directory across restarts. Run exactly one backend process per store directory. For a production deployment, replace it with a transactional database with unique order/plate keys and serialized writes. Add retention and backups for the source files.
 
-## Run the backend
+## Develop the React app
+
+Use Node 20.19 or later. Set `PRINTHIVE_API_KEY` privately for the Node backend, then run:
+
+```sh
+npm run dev
+```
+
+Vite serves the React app at <http://127.0.0.1:5173> with hot reload. The Node API listens on port 3078. Vite proxies the existing local API routes, so the browser never receives the SDK credential. `API_PORT` changes the development backend port.
+
+The frontend lives in `client/`; `components.json` configures the official shadcn registry. UI primitives are generated from its Radix Nova style. The app uses PrintHive semantic theme tokens and locally bundled fonts. The browser imports only the two shared pure mapping/status helpers from the backend source tree. Development file access is restricted to frontend assets, dependencies and those helpers; saved orders, uploaded files and Node-only source cannot be downloaded through Vite.
+
+## Build and run the full app
+
+```sh
+npm run build
+npm start
+```
+
+The Node server serves the compiled React app and its API on the same loopback port, 3000 by default. Set `PORT=3077` to use the local testing address. Keep `ORDER_DATA_DIR` unchanged across restarts to retain order identities and source snapshots. A missing frontend build returns an explicit setup error.
 
 ```sh
 npm start
@@ -68,7 +87,7 @@ The server binds to loopback and has no customer authentication. Before exposing
 
 ## Try an order in your browser
 
-With `PRINTHIVE_API_KEY` set privately on the server, run `npm start` and open <http://127.0.0.1:3000/>. The banner shows the destination from `PRINTHIVE_BASE_URL`, which defaults to `https://api.printhiv3d.com`.
+With `PRINTHIVE_API_KEY` set privately on the server, run `npm run build` and `npm start` and open <http://127.0.0.1:3000/>. The banner shows the destination from `PRINTHIVE_BASE_URL`, which defaults to `https://api.printhiv3d.com`.
 
 **Auto release in production queues a real print.** The form defaults to manual release so you can review the held request before authorizing it.
 
@@ -82,7 +101,7 @@ The page polls the create request once per second until `created`, `failed`, or 
 
 Uploads use multipart `POST /orders` with an `order` JSON field and a `file` field. The server limits the entire request to 16 MiB, copies the source into the durable order store, and removes its temporary upload directory. JSON requests keep the existing 64 KiB limit. The browser uses only this server's routes and never receives the API key. `GET /config` returns the destination without URL credentials, query strings, or fragments.
 
-![Manual request held for review against the local fake API](proof/ui/manual-held.png)
+Historical pre-React UI evidence: ![Manual request held for review against the local fake API](proof/ui/manual-held.png)
 
 The [original UI proof](proof/ui/README.md) is historical and uses a loopback stub. The running example uses the configured real API. Tests use local fixtures and do not submit production orders.
 
@@ -139,11 +158,11 @@ The job panel renders API-reported `filament_waiting_reasons` with material, col
 
 For a named mock printer, expand **Optional placement on a named printer** on a source filament and enter both API AMS ID and API slot ID. These optional indices become that filament's `targetSlot` in the preview, durable intent and request. They do not come from its Source Slot. Leave both fields empty for Hive to resolve placement; clearing the printer removes hints from the outgoing request. API AMS IDs 254 and 255 accept only slot 0. Changing a pinned hint requires a new order ID.
 
-The confirmed response lists only unmet filaments at job creation and claim recheck. Each row can include `cause`: `slot_empty`, `missing_material`, `color_distance` or `slot_conflict`. The job panel explains recognized causes and keeps an absent or unknown cause readable. Response colors may be six hex digits with or without `#`; displayed swatches normalize them while the raw API JSON stays unchanged. The upcoming SDK 0.3.1 exports `FilamentWaitingReason`, but remains unpublished. Local preview builds may use the workspace client; public setup will use the npm release after the API change merges. Request fields and mismatch policy are unchanged.
+The confirmed response lists only unmet filaments at job creation and claim recheck. Each row can include `cause`: `slot_empty`, `missing_material`, `color_distance` or `slot_conflict`. The job panel explains recognized causes and keeps an absent or unknown cause readable. Response colors may be six hex digits with or without `#`; displayed swatches normalize them while the raw API JSON stays unchanged. SDK 0.3.2 on main includes `FilamentWaitingReason` and live job reads, but is not yet published. Local preview builds may use the workspace client; public setup will pin the registry release after the real-stack proof and Node 20/24 registry-install tests pass. Request fields and mismatch policy are unchanged.
 
 `on_filament_mismatch` belongs to immutable order intent. Replaying a saved order retains its policy, source bytes, catalog selections and idempotency key. Changing the policy under the same order ID conflicts. Historical orders without a stored policy retain their original omitted field, whose API default is wait.
 
-The npm dependency remains 0.2.0 until a new release is approved. Install a locally packed SDK build containing `printJobs.get` for complete job following. The configuration response reports that method's availability. An older SDK shows an explicit unavailable message instead of silently adding another HTTP client.
+The npm dependency remains 0.2.0 until the approved 0.3.2 release is published and verified. Install a locally packed SDK build containing `printJobs.get` for complete job following. The configuration response reports that method's availability. An older SDK shows an explicit unavailable message instead of silently adding another HTTP client.
 
 All automated job writes and claim checks must use the owned isolated API, real database and Cloud Slice with mock printers. The live sample's configured production API is not a writable test fixture. Production may return `plate_selection_host_update_required` until its Host supports plate selection; the sample displays that admission result rather than bypassing it.
 
@@ -183,8 +202,18 @@ If Printie already has authoritative per-plate data, open **Advanced: supply kno
     {
       "number": 2,
       "filaments": [
-        { "sourceSlot": 0, "name": "Body", "material": "PETG", "color": "#000000" },
-        { "sourceSlot": 3, "name": "Accent", "material": "PETG", "color": "#FFFFFF" }
+        {
+          "sourceSlot": 0,
+          "name": "Body",
+          "material": "PETG",
+          "color": "#000000"
+        },
+        {
+          "sourceSlot": 3,
+          "name": "Accent",
+          "material": "PETG",
+          "color": "#FFFFFF"
+        }
       ]
     }
   ]
@@ -278,3 +307,15 @@ See [catalog sync verification](proof/catalog-sync/README.md) for the real SDK c
 A denied live job read stops automatic job polling. The existing create-receipt error path still retries on denied access; revoke/reload behavior there remains a follow-up.
 
 See [job-flow verification](docs/job-flow-verification.md) for local test results, labeled UI demos and the remaining real-stack and release work.
+
+## Verify the migration
+
+```sh
+npm run build
+npm test
+npm run test:ui
+```
+
+Backend tests cover real local HTTP serving, upload limits, preserved order intent, SDK adapters and private-file protection. React tests exercise requirement selection, request previews and immutable retries. The browser demo uses the built React app, actual SDK and Node backend against an explicitly labeled owned HTTP fixture; it covers uploaded plate selection, four filament mappings, manual release, live waiting reasons, rejection and catalog sync. These checks do not establish real Cloud Slice slicing, printer claims or physical printing. The separate real-stack release proof must pass before publishing the SDK and sample.
+
+The shipped app has no mock API mode. Its destination and SDK source are shown in the page. Credentials stay in the Node process; never put them in a `VITE_` environment variable. Use `npm run sdk:local` only for an explicitly local SDK build until the approved npm release is available.

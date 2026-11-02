@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
@@ -9,8 +9,14 @@ import { createOrderServer, MAX_UPLOAD_BYTES } from '../src/server.mjs';
 async function setup(t) {
   const directory = await mkdtemp(join(tmpdir(), 'http-orders-'));
   const calls = [];
+  const frontendDirectory = join(directory, 'web');
+  await mkdir(join(frontendDirectory, 'assets'), { recursive: true });
+  await writeFile(join(frontendDirectory, 'index.html'), '<div id="root"></div><script type="module" src="/assets/app.js"></script>');
+  await writeFile(join(frontendDirectory, 'assets/app.js'), 'export const app = "built frontend";');
+  await writeFile(join(frontendDirectory, 'assets/style.css'), 'body { margin: 0 }');
   const server = createOrderServer({
     directory,
+    frontendDirectory,
     baseUrl: 'http://user:private@127.0.0.1:9999/api?secret=private',
     hive: { printJobs: {
       create: async (input) => {
@@ -53,8 +59,12 @@ test('JSON bundled fixture and allowlisted page assets work without exposing URL
   assert.deepEqual({ ...config, sdk: undefined }, { baseUrl: 'http://127.0.0.1:9999/api', production: false, maxUploadBytes: MAX_UPLOAD_BYTES, sdk: undefined });
   assert.equal(typeof config.sdk.version, 'string');
   assert.equal(config.sdk.capabilities.filamentCatalog, false);
-  for (const path of ['/', '/app.js', '/style.css']) assert.equal((await fetch(s.url + path)).status, 200);
-  assert.equal((await fetch(s.url + '/src/client.mjs')).status, 404);
+  for (const path of ['/', '/assets/app.js', '/assets/style.css']) assert.equal((await fetch(s.url + path)).status, 200);
+  for (const path of ['/src/client.mjs', '/.env', '/package.json', '/assets/../src/client.mjs', '/assets/private.json', '/assets/%2e%2e%2fsrc%2fclient.mjs']) assert.equal((await fetch(s.url + path)).status, 404);
+  const script = await fetch(s.url + '/assets/app.js');
+  assert.match(script.headers.get('content-type'), /javascript/);
+  assert.equal(script.headers.get('x-content-type-options'), 'nosniff');
+  assert.match(script.headers.get('content-security-policy'), /connect-src 'self'/);
   assert.equal((await fetch(s.url + '/orders', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...input, file: 'cube.3mf' }) })).status, 202);
 });
 test('bad input returns 400 before calling Print Hive', async (t) => {
