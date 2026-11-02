@@ -56,3 +56,7 @@ The waiting view shows exactly the API's returned unmet rows. A row may use bare
 6. Inspect UI evidence, tear down only owned resources and release the lock. Preserve sanitized transcripts, coverage results and the exact source/package/image identities.
 
 This plan proves software admission and claim behavior with mock printers. It does not prove physical printing, production deployment or Hive Link 4.25.59 rollout. Docker was unresponsive during the initial update audit, so no new real-stack run is claimed yet.
+
+## Waiting guidance compatibility
+
+A `material_route_changed` reason means the material reading needs another check; it must not become an instruction to load every filament. A `slot_conflict` with an explicit target calls for changing the assignment. Without an explicit target it can require another matching spool, not a fabricated slot assignment. The current upstream evaluator can report a coarse material-type-or-color failure as `color_distance`; treat that cause as advisory and keep the required material/color visible. Detailed mismatch classification belongs to the shared Material Requirement work.

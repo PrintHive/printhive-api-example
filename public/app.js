@@ -360,7 +360,7 @@ function renderJob(receipt) {
   const reasons = job.filament_waiting_reasons;
   const instructions = waitingFilamentInstructions(reasons);
   $('waiting-json').textContent = JSON.stringify(reasons, null, 2);
-  $('waiting-summary').textContent = instructions.length ? 'Hive reports these filament loading requirements. Source slots identify project filaments; only an API-supplied target identifies a printer tray.' : job.filament_route_state === 'waiting' ? 'Hive is still resolving the material route. No loading details are available yet.' : 'No filament waiting reasons are reported. Printer readiness and claim checks still apply.';
+  $('waiting-summary').textContent = instructions.length ? 'Hive reports these filament checks. Source slots identify project filaments; only an API-supplied target identifies a printer tray.' : job.filament_route_state === 'waiting' ? 'Hive is still resolving the material route. No loading details are available yet.' : 'No filament waiting reasons are reported. Printer readiness and claim checks still apply.';
   for (const instruction of instructions) {
     const card = element('div', undefined, 'waiting-reason');
     card.append(element('strong', instruction.source), element('p', instruction.instruction));

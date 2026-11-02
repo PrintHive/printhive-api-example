@@ -10,6 +10,24 @@ import { createOrderServer } from '../src/server.mjs';
 import { PrintHive } from '@printhive/api';
 import { createHash } from 'node:crypto';
 
+test('slot-conflict guidance distinguishes explicit placement from another needed spool', () => {
+  const reason = { code: 'filament_not_loaded', sourceSlot: 3, material: 'PETG', color: 'FFFFFF', cause: 'slot_conflict' };
+  const placed = waitingFilamentInstructions([{ ...reason, suggestedTargetSlot: { ams_id: 0, slot_id: 3 } }])[0];
+  assert.match(placed.instruction, /Change the slot assignment/);
+  assert.doesNotMatch(placed.instruction, /^Load/);
+  const unplaced = waitingFilamentInstructions([reason])[0];
+  assert.match(unplaced.instruction, /^Load another PETG #FFFFFF spool/);
+  assert.match(unplaced.placement, /No physical slot supplied/);
+});
+
+test('uncertain readings do not become loading instructions and distance hints remain advisory', () => {
+  const uncertain = waitingFilamentInstructions([{ code: 'material_route_changed', sourceSlot: 7, material: 'PETG', color: 'FFFFFF' }])[0];
+  assert.match(uncertain.instruction, /Check.*reading/);
+  assert.doesNotMatch(uncertain.instruction, /^Load/);
+  const distance = waitingFilamentInstructions([{ code: 'filament_not_loaded', sourceSlot: 3, material: 'PETG', color: 'FFFFFF', cause: 'color_distance' }])[0];
+  assert.match(distance.explanation, /material or color/);
+});
+
 test('three of four loaded: display API-reported unmet source without inventing its physical slot', () => {
   const result = waitingFilamentInstructions([{ code: 'filament_not_loaded', sourceSlot: 7, material: 'PETG', color: '112233', cause: 'missing_material' }]);
   assert.equal(result.length, 1);
@@ -24,14 +42,14 @@ test('waiting instructions explain each cause while keeping optional and future 
   const descriptions = [
     ['slot_empty', 'The requested printer slot is empty.'],
     ['missing_material', 'The required material is not loaded.'],
-    ['color_distance', 'The loaded color is outside the allowed color distance.'],
+    ['color_distance', 'The loaded filament does not meet the material or color requirements.'],
     ['slot_conflict', 'The printer slots cannot satisfy all filament requirements at the same time.'],
   ];
   for (const [cause, explanation] of descriptions) {
     const [instruction] = waitingFilamentInstructions([{ code: 'filament_not_loaded', sourceSlot: 3, material: 'PETG', color: 'FFFFFF', cause }]);
     assert.equal(instruction.cause, cause);
     assert.equal(instruction.explanation, explanation);
-    assert.equal(instruction.instruction, 'Load PETG #FFFFFF for source slot 3.');
+    assert.equal(instruction.instruction, cause === 'slot_conflict' ? 'Load another PETG #FFFFFF spool for source slot 3; another source slot is using the matching loaded spool.' : 'Load PETG #FFFFFF for source slot 3.');
   }
   const base = { code: 'filament_not_loaded', sourceSlot: 0, material: 'PETG', color: '#ffffff' };
   const legacy = waitingFilamentInstructions([base])[0];
@@ -59,7 +77,7 @@ test('only API-supplied target indices identify a tray; route-change reasons rem
   const result = waitingFilamentInstructions([{ code: 'filament_not_loaded', sourceSlot: 3, material: 'PETG', color: '#000000', suggestedTargetSlot: { ams_id: 2, slot_id: 1 } }, { code: 'material_route_changed' }]);
   assert.equal(result[0].placement, 'API target: AMS 2, slot 1.');
   assert.equal(result[1].source, 'Material route');
-  assert.match(result[1].instruction, /Check the printer material route/);
+  assert.match(result[1].instruction, /Check the printer material readings/);
 });
 test('created request reads actual job status and waiting reasons, without treating creation as matched', async () => {
   const events = [];
