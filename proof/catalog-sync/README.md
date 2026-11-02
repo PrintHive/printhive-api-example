@@ -24,10 +24,10 @@ The merged SDK's normal build and OpenAPI drift check passed. Its tests passed w
 
 Local videos are ignored by Git and remain available in this checkout:
 
-- [Production desktop](production-desktop.webm), 1280 × 900, 19.84 seconds.
-- [Production phone](production-mobile.webm), 390 × 844, 19.88 seconds.
-- [SDK contract fixture](contract-desktop.webm), 1280 × 900, 22.92 seconds. The subtitle identifies the fixture throughout.
-- [Capability unavailable](capability-unavailable.webm), 390 × 844, 2.88 seconds.
+- Production desktop, 1280 × 900, 19.84 seconds.
+- Production phone, 390 × 844, 19.88 seconds.
+- SDK contract fixture, 1280 × 900, 22.92 seconds. The subtitle identifies the fixture throughout.
+- Capability unavailable, 390 × 844, 2.88 seconds.
 
 Discovery and rehearsal preceded recording. All exported durations were decoded and visually reviewed as 5 fps filmstrips, including their final segments. There were no browser errors, request-policy violations or horizontal overflow at either viewport. The production browser guard permitted GET and HEAD plus the local validation-preview POST. It blocked catalog sync and all order mutations.
 

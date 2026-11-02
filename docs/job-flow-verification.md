@@ -14,10 +14,10 @@ The updated example uses a locally packed, unpublished working build of SDK 0.3.
 
 These ignored local files are available in this checkout:
 
-- [Desktop job waiting and refresh](../data/current-job-flow-proof/desktop.webm), 23.64 seconds.
-- [Phone job waiting and refresh](../data/current-job-flow-proof/mobile.webm), 23.56 seconds.
-- [Immediate rejection](../data/current-job-flow-proof/reject-immediate.webm), 19.16 seconds.
-- [Asynchronous rejection](../data/current-job-flow-proof/reject-async.webm), 18.92 seconds.
+- Desktop job waiting and refresh, 23.64 seconds.
+- Phone job waiting and refresh, 23.56 seconds.
+- Immediate rejection, 19.16 seconds.
+- Asynchronous rejection, 18.92 seconds.
 
 Each recording uses the actual packed SDK and actual sample backend against an owned loopback HTTP contract fixture. The subtitle identifies that fixture. It is not a real API, database, engine or claim proof. The synthetic four-palette archive is a UI fixture, not a qualified slicing fixture. Fixture job-state changes establish UI refresh behavior, not execution or claim success.
 
