@@ -1,5 +1,6 @@
 import { serveWebAsset } from "./web-assets.mjs";
 import { createCatalogSync, catalogSyncError } from "./catalog-sync.mjs";
+import { createSearch } from "./search.mjs";
 import { sdkInfo } from "./sdk-info.mjs";
 import { inspectProject } from "./project-inspection.mjs";
 import { createHash } from "node:crypto";
@@ -30,6 +31,7 @@ async function readBody(req, limit) {
 export function createOrderServer({ hive, control, catalog, directory = "data", designs = "fixtures", baseUrl = "https://api.printhiv3d.com", frontendDirectory = builtFrontend }) {
   const orders = createOrders(hive, directory, undefined, catalog);
   const sync = createCatalogSync(hive);
+  const searchAdapter = createSearch(hive);
   designs = resolve(designs);
   // Show the destination without URL credentials, query strings, or fragments.
   const target = new URL(baseUrl);
@@ -68,6 +70,12 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
         try { validateCatalogQuery(search); } catch (error) { return reply(400, { error: error.message }); }
         try { return reply(200, await catalog.search(search)); }
         catch { return reply(502, { error: "Hive catalog lookup failed. Retry the search or check the filament ID." }); }
+      }
+      if (req.method === "GET" && pathname === "/printers") {
+        const search = new URL(req.url, "http://localhost").searchParams;
+        try { validateCatalogQuery(search); } catch (error) { return reply(400, { error: error.message }); }
+        try { return reply(200, await searchAdapter.printers(search)); }
+        catch (error) { return reply(error.status === 503 ? 503 : 502, { error: error.status === 503 ? error.message : "Printer search failed. Retry the search." }); }
       }
       if (req.method === "POST" && pathname === "/project-data/inspect") {
         if (!req.headers["content-type"]?.startsWith("multipart/form-data")) return reply(400, { error: "Upload the project as multipart/form-data" });
@@ -130,7 +138,7 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
           const bytes = await readFile(input.file);
           const sha256 = createHash("sha256").update(bytes).digest("hex");
           if (sha256 !== input.projectData.sha256.toLowerCase() || basename(input.file) !== input.projectData.filename)
-            return reply(400, { error: "Project data belongs to a different file; load the current Printie plate data" });
+            return reply(400, { error: "Project data belongs to a different file; load the current plate data" });
         }
         const record = await orders.submit(input);
         return reply(202, {

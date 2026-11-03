@@ -1,4 +1,4 @@
-# Printie single-plate job acceptance plan
+# Verify a single-plate job in an isolated Hive stack
 
 ## Boundary and ownership
 

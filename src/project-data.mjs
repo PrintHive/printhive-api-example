@@ -35,7 +35,7 @@ export function validateMappedInput(input) {
   if (!Array.isArray(input.plates) || input.plates.length !== 1)
     throw new Error('Choose exactly one plate');
   const plate = manifest.plates.find((p) => p.number === input.plates[0]);
-  if (!plate) throw new Error('Selected plate is absent from Printie project data');
+  if (!plate) throw new Error('Selected plate is absent from project data');
   if (!Array.isArray(input.mappings) || input.mappings.length !== plate.filaments.length)
     throw new Error('Choose one Hive requirement for every source filament on this plate');
   const mappings = new Map(), targetSlots = new Map();

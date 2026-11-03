@@ -178,3 +178,38 @@ describe("React order workflow", () => {
     expect(submitted[0]).toBe(submitted[1]);
   });
 });
+
+it("searches printers by free text and uses the selected UUID", async () => {
+  const calls = fixture((path) => {
+    if (!path.startsWith("/printers?")) return;
+    return Response.json({
+      printers: [
+        {
+          id: "22222222-2222-4222-8222-222222222222",
+          name: "Boo",
+          model: "P1S",
+          status: "idle",
+        },
+      ],
+      total: 1,
+      offset: 0,
+      hasMore: false,
+    });
+  });
+  render(<App />);
+  const user = userEvent.setup();
+  await user.type(
+    screen.getByLabelText("Find a printer by name or model"),
+    "Boo P1S",
+  );
+  await user.click(screen.getByRole("button", { name: "Find printers" }));
+  await user.click(await screen.findByRole("button", { name: "Use Boo" }));
+  expect(screen.getByLabelText("Printer ID (optional)")).toHaveValue(
+    "22222222-2222-4222-8222-222222222222",
+  );
+  expect(
+    calls.mock.calls.some(
+      ([path]) => String(path) === "/printers?q=Boo+P1S&offset=0",
+    ),
+  ).toBe(true);
+});

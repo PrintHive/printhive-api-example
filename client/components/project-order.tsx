@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/native-select";
 import { type OrderWorkflow } from "@/lib/use-order-workflow";
 import { Color, ReportedColors } from "./color";
+import { SdkCall } from "./sdk-call";
+import { PrinterSearch } from "./printer-search";
 import { FilamentMapping } from "./filament-mapping";
 
 export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
@@ -74,6 +76,10 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
             if (!flow.submitted) void flow.submit();
           }}
         >
+          <SdkCall call="Local upload and plate inspection">
+            Plate inspection makes no SDK call. Hive receives the file on
+            submission through client.printJobs.create below.
+          </SdkCall>
           <fieldset
             id="intent-fields"
             disabled={disabled}
@@ -167,12 +173,13 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
             <details id="project-editor" className="rounded-md border p-3">
               <summary className="cursor-pointer text-sm font-medium flex items-center gap-2">
                 <Braces className="size-4" />
-                Advanced: supply known Printie plate data
+                Advanced: supply known plate data
               </summary>
               <div className="mt-4 space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  Replace extracted candidates with source usage Printie has
-                  already resolved. This does not clear Hive inspection holds.
+                  Replace extracted candidates with source usage your
+                  application has already resolved. This does not clear Hive
+                  inspection holds.
                 </p>
                 <Label htmlFor="manifest-file">Import project data JSON</Label>
                 <Input
@@ -315,6 +322,7 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
                 <span className="step-index">03</span>
                 <h3 className="font-semibold">Choose the destination</h3>
               </div>
+              <PrinterSearch disabled={disabled} choose={flow.setPrinter} />
               <div className="space-y-2">
                 <Label htmlFor="printer">Printer ID (optional)</Label>
                 <Input
@@ -351,6 +359,12 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
               </div>
             </div>
           </fieldset>
+          <SdkCall call="client.printJobs.create({ file, filename, plate, filaments, printer_id, release, idempotencyKey })">
+            Hive uploads, inspects, and cloud-slices one plate. The server
+            resolves catalog IDs to material and color requirements. The server
+            saves the key before submission so an unchanged retry keeps the same
+            request.
+          </SdkCall>
           <div className="space-y-3 border-t pt-5">
             <Button
               id="preview"

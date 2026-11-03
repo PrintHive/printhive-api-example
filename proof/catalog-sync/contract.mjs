@@ -36,7 +36,7 @@ export async function fixture() {
   const hive = new PrintHive({ apiKey: 'owned-contract-fixture-key', baseUrl: `http://127.0.0.1:${api.address().port}`, maxRetries: 1 });
   return { hive, calls, rows, id, allowRetry: () => { failed = false; }, close: async () => { api.closeAllConnections(); await new Promise(r => api.close(r)); } };
 }
-export const record = { externalId: 'printie/lost response', brand: 'Example', material: 'PETG', colorName: 'Green', colorHex: '#39FF14', sku: 'PETG+GREEN & 01' };
+export const record = { externalId: 'store/lost response', brand: 'Example', material: 'PETG', colorName: 'Green', colorHex: '#39FF14', sku: 'PETG+GREEN & 01' };
 export async function contract() {
   const f = await fixture();
   try {

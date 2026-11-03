@@ -8,7 +8,7 @@ Run with the example already running:
 PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs node proof/filament-mapping/run.mjs
 ```
 
-The three-plate project is a small synthetic Bambu project from the Hive simulator fixture builder. Its known source-slot pairs are `[0, 1]`, `[1, 2]`, and `[0, 2]`. `three-plate.json` represents the plate data Printie supplies after processing that project. The project is used only in the browser and local preview; it is not submitted to Hive.
+The three-plate project is a small synthetic Bambu project from the Hive simulator fixture builder. Its known source-slot pairs are `[0, 1]`, `[1, 2]`, and `[0, 2]`. `three-plate.json` represents the plate data your application supplies after processing that project. The project is used only in the browser and local preview; it is not submitted to Hive.
 
 The proof covers:
 

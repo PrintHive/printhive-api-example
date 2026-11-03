@@ -54,7 +54,7 @@ try{
     await click(r,'#catalog-sync summary');
     await input(r,'#sync-input','{"log":{}}');await click(r,'#sync-preview');await expectText(r,'#sync-error','records array');assert.equal(await r.page.locator('#sync-all').isDisabled(),true);
     await subtitle(r,'Validate records locally; no catalog write');
-    await r.page.locator('#sync-file').setInputFiles({name:'printie-catalog.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify([{...record,externalId:'preview-only',sku:'PETG-GREEN'}],null,2))});
+    await r.page.locator('#sync-file').setInputFiles({name:'store-catalog.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify([{...record,externalId:'preview-only',sku:'PETG-GREEN'}],null,2))});
     await click(r,'#sync-preview');await expectText(r,'#sync-status','Preview only');assert.equal(await r.page.locator('#sync-preview-records .swatch').count(),1);
     assert.match(await r.page.locator('#sync-all').innerText(),/to production/);
     await subtitle(r,'Preview includes source identity, SKU and color swatch');

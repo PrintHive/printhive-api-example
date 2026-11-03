@@ -1,4 +1,7 @@
-# Public job-flow verification
+# Historical job-flow verification
+
+This record predates the published 0.3.2 adoption. Version and publication statements below describe that run. See [the current SDK reference](sdk-upgrade.md) for the committed dependency and search adapter.
+
 
 The updated example uses a locally packed, unpublished working build of SDK 0.3.0 with `printJobs.get`. Its registry dependency and lockfile remain at npm 0.2.0. The running example keeps its configured real production API destination; no fake API replaces that user service.
 

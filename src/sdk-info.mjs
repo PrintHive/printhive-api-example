@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
 import { readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { searchCapabilities } from './search.mjs';
 import { hasCatalogSync } from './catalog-sync.mjs';
 const require = createRequire(import.meta.url);
 function installedSdkPackage() {
@@ -17,5 +18,5 @@ export function sdkInfo(hive, markerPath = resolve('data/sdk-local.json')) {
   const version = loadedPackage.version;
   let source = 'installed-package';
   try { const marker = JSON.parse(readFileSync(markerPath, 'utf8')); if (marker.version === version && marker.kind === 'local-sdk-package') source = 'local-package'; if (marker.version === version && marker.kind === 'local-sdk-workspace' && realpathSync(marker.workspace) === loadedPackage.directory) source = 'local-workspace'; } catch { /* A normal registry install has no local build marker. */ }
-  return { version, source, capabilities: { filamentCatalog: hasCatalogSync(hive), printJobRead: typeof hive?.printJobs?.get === 'function' } };
+  return { version, source, capabilities: { search: searchCapabilities(hive), filamentCatalog: hasCatalogSync(hive), printJobRead: typeof hive?.printJobs?.get === 'function' } };
 }

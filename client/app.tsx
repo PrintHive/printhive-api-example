@@ -41,13 +41,13 @@ export default function App() {
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-3">
-              Project to production
+              Cloud slicing sample
             </p>
             <h1 className="font-heading text-3xl sm:text-4xl tracking-tight">
-              Try a print order
+              Slice a 3MF and follow its job
             </h1>
             <p className="mt-3 text-sm text-muted-foreground">
-              Choose a plate. Map its filaments. Follow it into your queue.
+              Use the SDK to map a plate, request cloud slicing, review the hold, and follow job status.
             </p>
           </div>
           <Badge variant="outline" className="w-fit">

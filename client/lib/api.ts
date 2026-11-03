@@ -55,6 +55,21 @@ export const catalogSchema = z.object({
   total: z.number(),
   offset: z.number(),
   hasMore: z.boolean(),
+  mode: z.string().optional(),
+  matchMode: z.string().optional(),
+});
+export const printersSchema = z.object({
+  printers: z.array(
+    z.object({
+      id: z.string().uuid(),
+      name: z.string(),
+      model: z.string().nullable(),
+      status: z.string().nullable(),
+    }),
+  ),
+  total: z.number(),
+  offset: z.number(),
+  hasMore: z.boolean(),
 });
 export const configSchema = z.object({
   baseUrl: z.string(),
