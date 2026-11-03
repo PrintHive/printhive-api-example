@@ -376,7 +376,7 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
           </fieldset>
           <SdkCall call="client.printJobs.create({ file, filename, plate, filaments, printer_id, release, idempotencyKey })">
             Hive uploads, inspects, and cloud-slices each selected plate in a
-            separate SDK request. The server resolves catalog IDs to material
+            separate SDK request. Hive resolves catalog IDs to material
             and color requirements. The server saves the key before submission
             so an unchanged retry keeps the same request.
           </SdkCall>
@@ -404,7 +404,7 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
               className="code-panel"
             >
               {flow.previewBusy
-                ? "Resolving catalog requirements…"
+                ? "Preparing catalog-ID requirements…"
                 : flow.payload
                   ? JSON.stringify(flow.payload, null, 2)
                   : "Choose a Hive requirement for every source filament on every selected plate, then preview the API requests."}

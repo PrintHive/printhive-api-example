@@ -177,7 +177,7 @@ export function FilamentMapping({
         <div id={finderId} className="space-y-4">
           <SdkCall call="client.filaments.search({ query, limit: 20, offset })">
             Hive searches catalog filaments by free text, such as black PETG or
-            bambu red. Select an organization catalog filament that can be used
+            bambu red. Select a catalog filament that can be used
             for job creation. Other search results explain why they cannot be
             selected.
           </SdkCall>

@@ -2,9 +2,19 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, open, rename } from "node:fs/promises";
 import { join, basename } from "node:path";
 import { PrintJobCreateStoppedError } from "@printhive/api";
-import { resolveMappedInput, validateMappedInput, validateTargetSlot } from "./project-data.mjs";
+import { materialIdPattern, resolveMappedInput, validateMappedInput, validateTargetSlot } from "./project-data.mjs";
 import { mappedPlateInputs, resolveMappedPlates } from "./mapped-plates.mjs";
 import { readCreatedJob } from "./job-status.mjs";
+
+const hexColor = /^#[a-fA-F0-9]{6}$/;
+const typed = (value) => typeof value === "string" && value.length > 0;
+// A requirement names a catalog filament, whose material and color Hive derives, or states both
+// itself. Explicit values beside a catalog ID travel unchanged for Hive's exact comparison.
+function validRequirement(f) {
+  if (!f || !Number.isInteger(f.sourceSlot) || f.sourceSlot < 0 || f.sourceSlot > 255) return false;
+  if (f.filamentId === undefined) return typed(f.material) && hexColor.test(f.color);
+  return materialIdPattern.test(f.filamentId) && (f.material === undefined || typed(f.material)) && (f.color === undefined || hexColor.test(f.color));
+}
 
 export function validateOrder(order) {
   if (
@@ -18,16 +28,7 @@ export function validateOrder(order) {
     !Array.isArray(order.filaments) ||
     !order.filaments.length ||
     new Set(order.filaments.map((f) => f?.sourceSlot)).size !== order.filaments.length ||
-    !order.filaments.every(
-      (f) =>
-        f &&
-        Number.isInteger(f.sourceSlot) &&
-        f.sourceSlot >= 0 &&
-        f.sourceSlot <= 255 &&
-        typeof f.material === "string" &&
-        f.material.length > 0 &&
-        /^#[a-fA-F0-9]{6}$/.test(f.color),
-    ) ||
+    !order.filaments.every(validRequirement) ||
     (order.printer_id !== undefined &&
       (typeof order.printer_id !== "string" || !order.printer_id.trim())) ||
     (order.release !== undefined &&
@@ -35,7 +36,7 @@ export function validateOrder(order) {
     (order.on_filament_mismatch !== undefined && !["wait", "reject"].includes(order.on_filament_mismatch))
   ) {
     throw new Error(
-      "Invalid order: supply id, file, unique positive plates, and typed filaments",
+      "Invalid order: supply id, file, unique positive plates, and filaments with a catalog filamentId or a material and color",
     );
   }
   for (const filament of order.filaments) validateTargetSlot(filament.targetSlot);
@@ -44,7 +45,7 @@ export function validateOrder(order) {
 
 // One process owns this directory. Calls serialize, including concurrent HTTP retries.
 // Each immutable intent includes a private copy of the source bytes.
-export function createOrders(hive, directory = "data", onReceipt = () => {}, catalog) {
+export function createOrders(hive, directory = "data", onReceipt = () => {}) {
   let queue = Promise.resolve();
   const path = (id) => {
     if (!/^[a-zA-Z0-9_-]{1,80}$/.test(id)) throw new Error("Invalid order id");
@@ -86,7 +87,7 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}, cat
       try { saved = await load(input.id); }
       catch (error) { if (error.code !== "ENOENT") throw error; }
       if (batch) {
-        input = await resolveMappedPlates(input, catalog, saved?.intent);
+        input = resolveMappedPlates(input, saved?.intent);
       } else if (saved) {
         const sort = (entries) => entries.sort(([left], [right]) => left - right);
         const placement = (target) => target ? [target.ams_id, target.slot_id] : null;
@@ -96,8 +97,7 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}, cat
           throw new Error("Order id conflicts with stored intent");
         input = { ...input, projectData, filaments: saved.intent.filaments, catalogSelections: saved.intent.catalogSelections };
       } else {
-        if (!catalog) throw new Error("Hive catalog is unavailable");
-        input = await resolveMappedInput(input, catalog);
+        input = resolveMappedInput(input);
       }
     }
     if (batch) { for (const requirement of input.plateRequirements) validateOrder({ ...input, filaments: requirement.filaments }); }

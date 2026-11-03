@@ -30,7 +30,7 @@ async function readBody(req, limit) {
 }
 
 export function createOrderServer({ hive, control, catalog, directory = "data", designs = "fixtures", baseUrl = "https://api.printhiv3d.com", frontendDirectory = builtFrontend }) {
-  const orders = createOrders(hive, directory, undefined, catalog);
+  const orders = createOrders(hive, directory);
   const sync = createCatalogSync(hive);
   const searchAdapter = createSearch(hive);
   designs = resolve(designs);
@@ -96,20 +96,12 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
         return reply(200, { filename: "cube.3mf", sha256: createHash("sha256").update(bytes).digest("hex"), plates: [{ number: 1, filaments: [{ sourceSlot: 0, name: "Cube", material: "PETG", color: "#39FF14" }] }] });
       }
       if (req.method === "POST" && pathname === "/orders/preview") {
-        if (!catalog) return reply(503, { error: "Hive catalog is unavailable" });
         const input = JSON.parse(await readBody(req, 65536));
         if (input.plateMappings !== undefined) {
-          mappedPlateInputs(input);
-          try {
-            const resolved = await resolveMappedPlates(input, catalog);
-            return reply(200, { plates: resolved.plateRequirements.map(({ plate, filaments }) => ({ plate, filaments })) });
-          } catch { return reply(400, { error: "A selected plate filament cannot form a requirement. Review all selected plate mappings." }); }
+          const resolved = resolveMappedPlates(input);
+          return reply(200, { plates: resolved.plateRequirements.map(({ plate, filaments }) => ({ plate, filaments })) });
         }
-        validateMappedInput(input);
-        try {
-          const resolved = await resolveMappedInput(input, catalog);
-          return reply(200, { plate: input.plates[0], filaments: resolved.filaments });
-        } catch { return reply(400, { error: "A selected Hive filament cannot form a single-color requirement. Search again and choose a current catalog entry." }); }
+        return reply(200, { plate: input.plates[0], filaments: resolveMappedInput(input).filaments });
       }
       if (req.method === "GET" && pathname === "/config")
         return reply(200, { baseUrl: displayUrl, production, maxUploadBytes: MAX_UPLOAD_BYTES, sdk: sdkInfo(hive) });
@@ -142,7 +134,6 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
           input = { ...input, file };
         } else return reply(400, { error: "Use application/json or multipart/form-data" });
         if (input?.projectData !== undefined || input?.mappings !== undefined) {
-          if (!catalog) return reply(503, { error: "Hive catalog is unavailable" });
           if (input.plateMappings !== undefined) mappedPlateInputs(input);
           else validateMappedInput(input);
           const bytes = await readFile(input.file);
@@ -166,11 +157,15 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
       }
       reply(404, { error: "Not found" });
     } catch (error) {
-      reply(error.code === "ENOENT" ? 404 : error.status === 413 ? 413 : error.status === 422 ? 422 : 400, {
-        error: error.status === 413 ? "Request too large" : error.status === 422 ? "Hive rejected this request; no job was accepted. Review the API code and request status before changing or retrying." : "Order operation failed; check input or read status before retrying",
-        code: error.code,
-        upstreamStatus: error.status,
-      });
+      const upstreamStatus = Number.isInteger(error.status) ? error.status : undefined;
+      const code = typeof error.code === "string" && /^[a-z0-9_:.-]{1,80}$/i.test(error.code) ? error.code : undefined;
+      const status = error.code === "ENOENT" ? 404 : [413, 422, 503].includes(upstreamStatus) ? upstreamStatus : 400;
+      const messages = {
+        413: "Request too large",
+        422: "Hive rejected this request; no job was accepted. Review the API code and request status before changing or retrying.",
+        503: "Print Hive is temporarily unavailable. Read order status before retrying the unchanged request with the same order ID.",
+      };
+      reply(status, { error: messages[status] ?? "Order operation failed; check input or read status before retrying", code, upstreamStatus });
     } finally {
       if (temporary) await rm(temporary, { recursive: true, force: true });
     }

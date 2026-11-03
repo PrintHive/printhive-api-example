@@ -24,6 +24,6 @@ try {
     if (errors.length) throw new Error(errors.join('\n'));
     console.log(JSON.stringify({ viewport: name, ...result, errors }));
     await context.close();
-    if (!rehearse) await page.video().saveAs(resolve(`data/general-sample-video/sdk-0.4.0-${name}.webm`));
+    if (!rehearse) await page.video().saveAs(resolve(`data/general-sample-video/sdk-0.4.1-${name}.webm`));
   }
 } finally { await browser.close(); }

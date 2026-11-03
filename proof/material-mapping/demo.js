@@ -25,13 +25,12 @@ window.runMaterialDemo = async ({ archive, rehearse = false }) => {
   await say('Step 1 - Select three plates');
   await click('[aria-label="Include plate 7"]'); await click('[aria-label="Include plate 9"]');
   await click('[aria-label="Configure plate 2"]');
-  await say('Step 2 - SDK 0.4.0 searches and create eligibility');
+  await say('Step 2 - SDK 0.4.1 searches and create eligibility');
   await until(() => document.querySelector('#search-2-0'));
   await type('#search-2-0', 'black PETG'); await click('text:Search');
   await until(() => [...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Use Black PETG')); await pause(1000);
   await type('#search-2-0', 'bambu red'); await click('text:Search');
   await until(() => [...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Use Red PETG'));
-  if (!get('text:Use Global Red PETG').disabled) throw new Error('Global filament should be search-only in 0.4.0');
   await pause(1200);
   await click('text:Use Red PETG');
   if (!get('#submit').disabled) throw new Error('Usage confirmation bypassed');
@@ -56,8 +55,8 @@ window.runMaterialDemo = async ({ archive, rehearse = false }) => {
   await until(() => [...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Use Boo mock printer')); await click('text:Use Boo mock printer');
   await click('#preview'); await until(() => get('#payload').textContent.includes('"plate": 9'));
   const payload = JSON.parse(get('#payload').textContent);
-  const requirements = payload.plates.map(p => [p.plate, p.filaments[0].sourceSlot, p.filaments[0].filamentId, p.filaments[0].color]);
-  if (JSON.stringify(requirements) !== JSON.stringify([[2,0,'11111111-1111-4111-8111-111111111111','#B44235'],[7,0,'33333333-3333-4333-8333-333333333333','#296AAB'],[9,1,'11111111-1111-4111-8111-111111111111','#B44235']])) throw new Error(JSON.stringify(requirements));
+  const requirements = payload.plates.map(p => [p.plate, p.filaments[0].sourceSlot, p.filaments[0].filamentId]);
+  if (JSON.stringify(requirements) !== JSON.stringify([[2,0,'11111111-1111-4111-8111-111111111111'],[7,0,'33333333-3333-4333-8333-333333333333'],[9,1,'11111111-1111-4111-8111-111111111111']])) throw new Error(JSON.stringify(requirements));
   await view('#payload'); await pause(1500); get('#payload').scrollTo({ top: get('#payload').scrollHeight, behavior: rehearse ? 'instant' : 'smooth' }); await pause(1500);
   const result = { requirements, canSubmit: !get('#submit').disabled, overflow: document.documentElement.scrollWidth > innerWidth };
   if (result.overflow) throw new Error('Horizontal overflow');

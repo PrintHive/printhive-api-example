@@ -20,7 +20,7 @@ Inspection rejects malformed ZIPs, unsafe or duplicate paths, encrypted entries,
 
 A confirmed project has a filename, SHA-256, and plates. Each plate contains a unique positive `number` and source filaments with a unique zero-based `sourceSlot`, a material type, a six-digit hex color, and an optional name.
 
-The browser sends selected plate numbers and `plateMappings`, with one mapping group per plate and one entry per confirmed source filament. The backend stores one source snapshot and separate resolved requirements and idempotency keys for each plate. `mappings[].materialId` is a Hive catalog UUID, distinct from `sourceSlot`. The backend verifies the filename and source bytes again before submission. It reads catalog material and color server-side and persists the resolved requirements for retries. Confirmation never approves Hive inspection holds.
+The browser sends selected plate numbers and `plateMappings`, with one mapping group per plate and one entry per confirmed source filament. The backend stores one source snapshot and separate catalog-ID requirements and idempotency keys for each plate. `mappings[].materialId` is a Hive catalog UUID, distinct from `sourceSlot`. The backend verifies the filename and source bytes again before submission. Hive resolves material and color during creation. Stored orders from earlier sample versions retain their original requirements for retries. Confirmation never approves Hive inspection holds.
 
 ## Saved preview limits
 

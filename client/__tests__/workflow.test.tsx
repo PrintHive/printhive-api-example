@@ -30,7 +30,7 @@ const config = {
   production: false,
   maxUploadBytes: 16 * 1024 * 1024,
   sdk: {
-    version: "0.4.0",
+    version: "0.4.1",
     source: "local-workspace",
     capabilities: { filamentCatalog: true, printJobRead: true },
   },
@@ -239,11 +239,11 @@ it("shows SDK search results but disables filaments not accepted by create", asy
         {
           ...material,
           id: "44444444-4444-4444-8444-444444444444",
-          name: "Global PETG",
+          name: "Global PETG without color",
           selectable: false,
           acceptedByCreate: false,
           unavailableReason:
-            "Use an organization catalog filament for job creation.",
+            "Hive does not accept this filament for print-job creation: it has no usable color.",
         },
       ],
       total: 2,
@@ -257,16 +257,40 @@ it("shows SDK search results but disables filaments not accepted by create", asy
     await screen.findByRole("button", { name: "Use Fixture PETG" }),
   ).toBeEnabled();
   expect(
-    screen.getByRole("button", { name: "Use Global PETG" }),
+    screen.getByRole("button", { name: "Use Global PETG without color" }),
   ).toBeDisabled();
   expect(
-    screen.getByText("Use an organization catalog filament for job creation."),
+    screen.getByText("Hive does not accept this filament for print-job creation: it has no usable color."),
   ).toBeInTheDocument();
   expect(
     screen.queryByText(
       /legacy catalog|SDK search unavailable|Direct catalog ID lookup/,
     ),
   ).not.toBeInTheDocument();
+});
+
+it("selects an eligible global filament and previews its catalog ID", async () => {
+  const globalId = "44444444-4444-4444-8444-444444444444";
+  let requested: unknown;
+  fixture((path, init) => {
+    if (path.startsWith("/catalog?")) return Response.json({
+      materials: [{ ...material, id: globalId, name: "Generic PETG-CF", materialType: "PETG-CF", color: "#000000", acceptedByCreate: true }],
+      total: 1, offset: 0, hasMore: false, mode: "sdk-search",
+    });
+    if (path === "/orders/preview") {
+      requested = JSON.parse(String(init?.body));
+      return Response.json({ plates: [{ plate: 1, filaments: [{ sourceSlot: 0, filamentId: globalId }] }] });
+    }
+  });
+  const user = userEvent.setup();
+  render(<App />);
+  const choose = await screen.findByRole("button", { name: "Use Generic PETG-CF" });
+  expect(choose).toBeEnabled();
+  await user.click(choose);
+  await user.click(screen.getByRole("button", { name: "Preview API request" }));
+  await waitFor(() => expect(screen.getByLabelText("API request preview")).toHaveTextContent(globalId));
+  expect(requested).toMatchObject({ plateMappings: [{ plate: 1, mappings: [{ sourceSlot: 0, materialId: globalId }] }] });
+  expect(screen.getByRole("button", { name: "Submit order" })).toBeEnabled();
 });
 
 it("selects preview cards, preserves per-plate mappings, and controls each submitted plate separately", async () => {

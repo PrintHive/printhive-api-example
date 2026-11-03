@@ -1,6 +1,6 @@
 # Shared material mapping verification
 
-[Desktop recording](desktop.mp4) and [mobile recording](mobile.mp4) show the built React app and Node backend using published SDK 0.4.0 with an owned loopback API fixture. CSS viewports are 1280 by 900 and 390 by 844. The final exported videos received complete playback and visual review before publication.
+[Desktop recording](desktop.mp4) and [mobile recording](mobile.mp4) are historical SDK 0.4.0 captures of the built React app and Node backend with an owned loopback API fixture. CSS viewports are 1280 by 900 and 390 by 844. The final exported videos received complete playback and visual review before publication. Current global-filament behavior is covered by the [SDK 0.4.1 proof](../global-filaments/README.md).
 
 The scenario uses a generated metadata-only project. Plates 2 and 7 share source slot 0. Plate 9 uses slot 1 with the same original material and color, so it must not inherit slot 0's assignment.
 
@@ -14,7 +14,7 @@ Both paths show these behaviors:
 - Plate 9 stays unmapped until assigned explicitly despite its identical original color.
 - The resolved preview carries source slots and catalog `filamentId` values for red on plate 2, blue on plate 7, and red on plate 9. Submission becomes enabled.
 
-This is UI and protocol proof with synthetic API responses, not real catalog relevance, slicing, or physical printing. No production API, real printer, production credential, user design, or port 3077 was used. Global catalog creation remains unsupported by the sample's SDK 0.4.0 flow; pending 0.4.1 work is described in the SDK reference.
+This is UI and protocol proof with synthetic API responses, not real catalog relevance, slicing, or physical printing. No production API, real printer, production credential, user design, or port 3077 was used. Global catalog blocking in these historical videos reflects the old 0.4.0 contract.
 
 `DEMO_PROJECT=shared` selects this scenario in `proof/general-sample/serve.mjs`, which binds to loopback on port 3086. `DEMO_PORT` changes that port. `demo.js` contains the discovered selectors, cursor, captions, and assertions used by the shared browser. `record.mjs` reproduces the scenario with Playwright. Its `--rehearse` option skips video output; `PLAYWRIGHT_PACKAGE` can identify an external Playwright installation. Raw recordings stay under ignored `data/material-mapping`.
 

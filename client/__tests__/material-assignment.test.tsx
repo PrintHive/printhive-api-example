@@ -51,7 +51,7 @@ function fixture(manual = false, options: { project?: typeof project } = {}) {
           production: false,
           maxUploadBytes: 16777216,
           sdk: {
-            version: "0.4.0",
+            version: "0.4.1",
             source: "installed-package",
             capabilities: { filamentCatalog: true, printJobRead: true },
           },

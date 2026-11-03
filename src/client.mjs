@@ -16,7 +16,7 @@ export function clientFromEnv() {
     throw new Error("Use HTTPS or a loopback development API");
   }
   const hive = new PrintHive({ apiKey, baseUrl });
-  // SDK 0.4.0 has no release/cancel helpers. Keep credentials on this backend.
+  // SDK 0.4.1 has no release/cancel helpers.
   async function control(requestId, action) {
     if (!["release", "cancel"].includes(action))
       throw new Error("Invalid action");

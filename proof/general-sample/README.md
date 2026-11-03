@@ -1,6 +1,6 @@
 # Historical general sample UI verification
 
-These recordings describe the earlier SDK adoption. The current sample uses published SDK 0.4.0; see [the current SDK reference](../../docs/sdk-upgrade.md). The runner now uses the published search routes.
+These recordings describe the earlier SDK adoption. The current sample uses published SDK 0.4.1; see [the current SDK reference](../../docs/sdk-upgrade.md). The runner now uses the published search routes.
 
 The recordings use the built React app, the real installed SDK, and the Node backend against `serve.mjs`, an owned loopback HTTP fixture. The fixture has no slicing engine, database, printer connection, or production credentials. It accepts only the bundled `cube.3mf` filename.
 

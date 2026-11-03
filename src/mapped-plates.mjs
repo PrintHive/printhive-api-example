@@ -15,17 +15,17 @@ export function mappedPlateInputs(input) {
   });
 }
 
-export async function resolveMappedPlates(input, catalog, savedIntent) {
+export function resolveMappedPlates(input, savedIntent) {
   const inputs = mappedPlateInputs(input);
   const bindings = inputs.map(value => {
     const { mappings, targetSlots } = validateMappedInput(value);
     return { plate: value.plates[0], mappings: [...mappings].sort(([a], [b]) => a - b).map(([sourceSlot, materialId]) => ({ sourceSlot, materialId: materialId.toLowerCase(), ...(targetSlots.has(sourceSlot) ? { targetSlot: targetSlots.get(sourceSlot) } : {}) })) };
   });
   if (savedIntent && JSON.stringify(savedIntent.plateMappings) !== JSON.stringify(bindings)) throw new Error('Order id conflicts with stored intent');
-  const requirements = savedIntent ? savedIntent.plateRequirements : await Promise.all(inputs.map(async value => {
-    const resolved = await resolveMappedInput(value, catalog);
+  const requirements = savedIntent ? savedIntent.plateRequirements : inputs.map(value => {
+    const resolved = resolveMappedInput(value);
     return { plate: value.plates[0], filaments: resolved.filaments, catalogSelections: resolved.catalogSelections };
-  }));
+  });
   if (!requirements) throw new Error('Order id conflicts with stored intent');
   return { ...input, plates: inputs.map(value => value.plates[0]), projectData: validateMappedInput(inputs[0]).projectData, plateMappings: bindings, plateRequirements: requirements };
 }

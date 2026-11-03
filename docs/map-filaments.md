@@ -9,9 +9,9 @@
 7. To override a plate, open that plate and click **Change requirement**. The change stays on that plate. Catalog presence does not establish printer compatibility or loaded inventory.
 8. Review the selected catalog UUIDs in the mapping cards.
 9. Repeat usage confirmation for every selected plate. Shared assignment does not confirm usage.
-10. Click **Preview API request**. Check each plate's catalog `filamentId`, source slots, resolved material and color, and optional target data before submission.
+10. Click **Preview API request**. Check each plate's catalog `filamentId`, source slots, and optional target data before submission.
 
-The browser sends each selected catalog UUID as `plateMappings[].mappings[].materialId`. The resolved preview includes that catalog UUID as `plates[].filaments[].filamentId`, alongside the material, color, and optional placement data.
+The browser sends each selected catalog UUID as `plateMappings[].mappings[].materialId`. The preview includes that UUID as `plates[].filaments[].filamentId`, alongside the source slot and optional placement data. Hive resolves the catalog material and color during creation.
 
 If you already have authoritative per-plate usage, open **Advanced: supply known plate data**. Import or paste this JSON, then click **Use project data**:
 

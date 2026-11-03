@@ -132,18 +132,25 @@ export const acceptedSchema = z.object({
     z.object({ plate: z.number(), requestId: z.string().nullable() }),
   ),
 });
+const targetSlotSchema = z.object({ ams_id: z.number(), slot_id: z.number() });
+const catalogRequirementSchema = z.object({
+  sourceSlot: z.number(),
+  filamentId: z.string().uuid(),
+  material: z.string().optional(),
+  color: z.string().optional(),
+  targetSlot: targetSlotSchema.optional(),
+});
+const typedRequirementSchema = z.object({
+  sourceSlot: z.number(),
+  material: z.string(),
+  color: z.string(),
+  filamentId: z.string().uuid().optional(),
+  targetSlot: targetSlotSchema.optional(),
+});
 const plateRequestPreviewSchema = z.object({
   plate: z.number(),
   filaments: z.array(
-    z.object({
-      sourceSlot: z.number(),
-      filamentId: z.string().uuid().optional(),
-      material: z.string(),
-      color: z.string(),
-      targetSlot: z
-        .object({ ams_id: z.number(), slot_id: z.number() })
-        .optional(),
-    }),
+    z.union([catalogRequirementSchema, typedRequirementSchema]),
   ),
 });
 export const previewSchema = z.object({

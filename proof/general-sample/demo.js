@@ -17,7 +17,7 @@ window.runSampleDemo = async ({ cancel = false, rehearse = false } = {}) => {
   const click = async selector => { const el = await view(selector); if (el.disabled) throw new Error(`Disabled: ${selector}`); el.click(); await pause(650); };
   const type = async (selector, text) => { const el = await view(selector); el.focus(); const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; setter.call(el, ''); el.dispatchEvent(new Event('input', { bubbles: true })); for (const ch of text) { setter.call(el, el.value + ch); el.dispatchEvent(new Event('input', { bubbles: true })); await pause(35); } await pause(400); };
   await until(() => document.querySelector('#search-1-0'));
-  await say('Step 1 - Published SDK 0.4.0');
+  await say('Step 1 - Published SDK 0.4.1');
   await view('#sdk-info');
   await click('#project-editor summary'); await pause(1300); await click('#project-editor summary');
   await say('Step 2 - Map a plate filament');
