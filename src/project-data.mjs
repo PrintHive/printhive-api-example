@@ -54,14 +54,16 @@ export function validateMappedInput(input) {
 export async function resolveMappedInput(input, catalog) {
   const { projectData, plate, mappings, targetSlots } = validateMappedInput(input);
   const selections = await Promise.all(plate.filaments.map(async (source) => {
-    const filament = await catalog.get(mappings.get(source.sourceSlot));
+    const materialId = mappings.get(source.sourceSlot);
+    const filament = await catalog.get(materialId);
     if (!filament.selectable) throw new Error(`Source slot ${source.sourceSlot}: ${filament.unavailableReason}`);
+    if (typeof filament.id !== 'string' || filament.id.toLowerCase() !== materialId.toLowerCase()) throw new Error(`Source slot ${source.sourceSlot}: Hive catalog returned a different filament`);
     return { sourceSlot: source.sourceSlot, ...filament };
   }));
   return {
     ...input,
     projectData,
     catalogSelections: selections,
-    filaments: selections.map((f) => ({ sourceSlot: f.sourceSlot, material: f.materialType, color: f.color, ...(targetSlots.has(f.sourceSlot) ? { targetSlot: targetSlots.get(f.sourceSlot) } : {}) })),
+    filaments: selections.map((f) => ({ sourceSlot: f.sourceSlot, filamentId: f.id, material: f.materialType, color: f.color, ...(targetSlots.has(f.sourceSlot) ? { targetSlot: targetSlots.get(f.sourceSlot) } : {}) })),
   };
 }

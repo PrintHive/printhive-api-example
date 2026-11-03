@@ -4,7 +4,7 @@
 
 Drive the public sample and simulator through the actual locally packed `@printhive/api` client into an owned isolated real API, Supabase database/Storage and Cloud Slice/HiveSlice engine. Continue through job creation, live job reads and the material claim recheck using mock printers only. Controlled HTTP fixtures establish SDK/UI contracts separately and never stand in for real slicing or persistence proof.
 
-The initial release proof used unchanged main source `84967559f80b29de10d3d2b4355091204682bf23` and the actual packed SDK. The public sample now pins published 0.3.2, tested from the npm registry on Node 20 and 24. Returned waiting rows contain only unmet filaments, with optional causes; `FilamentWaitingReason` is publicly exported. The full matrix below remains a plan, not a claim that every case ran.
+The initial release proof used unchanged main source `84967559f80b29de10d3d2b4355091204682bf23` and the actual packed SDK. That release proof used published SDK 0.3.2 from the registry on Node 20 and 24. The current sample pins 0.4.0; see the [SDK reference](sdk-upgrade.md). Returned waiting rows contain only unmet filaments, with optional causes; `FilamentWaitingReason` is publicly exported. The full matrix below remains a plan, not a claim that every case ran.
 
 Use the verify-api owned partner project and its existing run lock. Hold the lock from seeding through teardown; refuse a busy lock. Never use shared Supabase ports or reset an unowned project. Allocate owned API, Redis and Cloud Slice resources, bind them to loopback and seed API keys privately. Only stop processes and containers created by this run. Do not use the lab Host, real printers, live farm or production writes.
 

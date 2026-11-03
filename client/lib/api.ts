@@ -55,6 +55,7 @@ export const materialSchema = z.object({
   materialType: z.string(),
   color: z.string().nullable(),
   selectable: z.boolean(),
+  acceptedByCreate: z.boolean().optional(),
   unavailableReason: z.string().nullable(),
 });
 export const catalogSchema = z.object({
@@ -136,6 +137,7 @@ const plateRequestPreviewSchema = z.object({
   filaments: z.array(
     z.object({
       sourceSlot: z.number(),
+      filamentId: z.string().uuid().optional(),
       material: z.string(),
       color: z.string(),
       targetSlot: z

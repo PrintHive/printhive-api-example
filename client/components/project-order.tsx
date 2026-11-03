@@ -285,7 +285,20 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
                 physical placement.
               </p>
               <div id="filaments" className="space-y-4">
-                {flow.currentPlate?.filaments.map((source) => (
+                {flow.extracted &&
+                  !flow.confirmed[flow.plateNumber] &&
+                  flow.currentSources.length > 0 && (
+                    <p
+                      id="mapping-pending"
+                      className="text-xs text-muted-foreground"
+                      role="status"
+                    >
+                      Usage for plate {flow.plateNumber} is not confirmed yet.
+                      Choices stay with these source slots; confirm usage above
+                      before submitting.
+                    </p>
+                  )}
+                {flow.currentSources.map((source) => (
                   <FilamentMapping
                     key={`${flow.project?.sha256}-${flow.plateNumber}-${source.sourceSlot}`}
                     source={source}
@@ -296,11 +309,25 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
                     disabled={disabled}
                     choose={(value) => flow.choose(source.sourceSlot, value)}
                     setHint={(value) => flow.setHint(source.sourceSlot, value)}
+                    bulkTargets={flow.bulkTargets(source.sourceSlot)}
+                    applyToTargets={() =>
+                      flow.applyToMatching(source.sourceSlot)
+                    }
                   />
                 ))}
-                {!flow.currentPlate && (
+                {!flow.currentSources.length && (
                   <p className="rounded-md border border-dashed p-5 text-center text-sm text-muted-foreground">
-                    Confirm plate usage to map its filament requirements.
+                    Select the source filaments above to assign requirements.
+                    Confirm usage before submitting.
+                  </p>
+                )}
+                {flow.bulkNotice && (
+                  <p
+                    id="bulk-status"
+                    className="text-xs text-muted-foreground"
+                    role="status"
+                  >
+                    {flow.bulkNotice}
                   </p>
                 )}
               </div>

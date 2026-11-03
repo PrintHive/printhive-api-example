@@ -1,4 +1,6 @@
-# Plate-selection verification
+# Historical plate-selection verification
+
+These recordings document the first multi-plate implementation with SDK 0.3.2. The [material mapping verification](../material-mapping/README.md) covers the current shared assignment and SDK 0.4.0 flow.
 
 [Desktop recording](desktop.mp4) and [mobile recording](mobile.mp4) show the built React app, Node backend, and published SDK 0.3.2 against an owned loopback HTTP fixture. The CSS viewports are 1280 by 900 and 390 by 844. The exported recordings received full playback and visual review before publication.
 

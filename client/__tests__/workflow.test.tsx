@@ -30,7 +30,7 @@ const config = {
   production: false,
   maxUploadBytes: 16 * 1024 * 1024,
   sdk: {
-    version: "0.3.1",
+    version: "0.4.0",
     source: "local-workspace",
     capabilities: { filamentCatalog: true, printJobRead: true },
   },
@@ -230,30 +230,43 @@ it("searches printers by free text and uses the selected UUID", async () => {
   ).toBe(true);
 });
 
-it("labels an exact catalog ID read as HTTP without claiming SDK search is unavailable", async () => {
+it("shows SDK search results but disables filaments not accepted by create", async () => {
   fixture((path) => {
-    if (path !== `/catalog?q=${material.id}&offset=0`) return;
+    if (!path.startsWith("/catalog?")) return;
     return Response.json({
-      materials: [material],
-      total: 1,
+      materials: [
+        material,
+        {
+          ...material,
+          id: "44444444-4444-4444-8444-444444444444",
+          name: "Global PETG",
+          selectable: false,
+          acceptedByCreate: false,
+          unavailableReason:
+            "Use an organization catalog filament for job creation.",
+        },
+      ],
+      total: 2,
       offset: 0,
       hasMore: false,
-      mode: "catalog-item-http",
+      mode: "sdk-search",
     });
   });
   render(<App />);
-  await screen.findByRole("button", { name: "Use Fixture PETG" });
-  const user = userEvent.setup();
-  const query = screen.getByLabelText(
-    "Find a Hive filament by name, SKU, or ID",
-  );
-  await user.clear(query);
-  await user.type(query, material.id);
-  await user.click(screen.getByRole("button", { name: "Search" }));
   expect(
-    await screen.findByText(/HTTP GET \/v1\/materials\/\{id\}/),
+    await screen.findByRole("button", { name: "Use Fixture PETG" }),
+  ).toBeEnabled();
+  expect(
+    screen.getByRole("button", { name: "Use Global PETG" }),
+  ).toBeDisabled();
+  expect(
+    screen.getByText("Use an organization catalog filament for job creation."),
   ).toBeInTheDocument();
-  expect(screen.queryByText(/SDK search unavailable/)).not.toBeInTheDocument();
+  expect(
+    screen.queryByText(
+      /legacy catalog|SDK search unavailable|Direct catalog ID lookup/,
+    ),
+  ).not.toBeInTheDocument();
 });
 
 it("selects preview cards, preserves per-plate mappings, and controls each submitted plate separately", async () => {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, mkdtemp, rm, readdir } from 'node:fs/promises';
+import { readFile, mkdtemp, rm, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -26,7 +26,7 @@ test('one local source snapshot creates only selected plates with independent re
     calls.push(value); return { requestId: `request-${value.plate}` };
   } } }, f.directory, undefined, f.catalog);
   await orders.submit(f.input);
-  assert.deepEqual(calls.map(v => [v.plate, v.filaments]), [[2, [{ sourceSlot: 0, material: 'PETG', color: '#B44235' }]], [7, [{ sourceSlot: 0, material: 'PETG', color: '#296AAB' }]]]);
+  assert.deepEqual(calls.map(v => [v.plate, v.filaments]), [[2, [{ sourceSlot: 0, filamentId: a, material: 'PETG', color: '#B44235' }]], [7, [{ sourceSlot: 0, filamentId: b, material: 'PETG', color: '#296AAB' }]]]);
   assert.equal(calls[0].file, calls[1].file);
   assert.deepEqual((await readdir(f.directory)).sort(), ['selected-plates.3mf', 'selected-plates.json']);
   await orders.submit(f.input);
@@ -56,7 +56,7 @@ test('HTTP preview and one multipart upload preserve per-plate mappings', async 
   t.after(async () => { server.closeAllConnections(); await new Promise(r => server.close(r)); });
   const url = `http://127.0.0.1:${server.address().port}`;
   const preview = await fetch(url + '/orders/preview', { method: 'POST', body: JSON.stringify(f.input) });
-  assert.deepEqual(await preview.json(), { plates: [{ plate: 2, filaments: [{ sourceSlot: 0, material: 'PETG', color: '#B44235' }] }, { plate: 7, filaments: [{ sourceSlot: 0, material: 'PETG', color: '#296AAB' }] }] });
+  assert.deepEqual(await preview.json(), { plates: [{ plate: 2, filaments: [{ sourceSlot: 0, filamentId: a, material: 'PETG', color: '#B44235' }] }, { plate: 7, filaments: [{ sourceSlot: 0, filamentId: b, material: 'PETG', color: '#296AAB' }] }] });
   assert.equal(calls.length, 0);
   const form = new FormData(); form.set('order', JSON.stringify(f.input)); form.set('file', new Blob([f.bytes]), 'valid.3mf');
   const submitted = await fetch(url + '/orders', { method: 'POST', body: form });
@@ -69,4 +69,18 @@ test('selecting a subset never submits unselected manifest plates', async t => {
   const orders = createOrders({ printJobs: { create: async value => { plates.push(value.plate); return { requestId: 'only-blue' }; } } }, f.directory, undefined, f.catalog);
   await orders.submit({ ...f.input, plates: [7], plateMappings: [f.input.plateMappings[1]] });
   assert.deepEqual(plates, [7]);
+});
+
+test('batches stored before catalog IDs replay their saved per-plate requirements and keys unchanged', async t => {
+  const f = await fixture(t), calls = []; let fail = true;
+  const hive = { printJobs: { create: async value => { calls.push(value); if (value.plate === 7 && fail) { fail = false; throw new Error('Lost response'); } return { requestId: `request-${value.plate}` }; } } };
+  await assert.rejects(createOrders(hive, f.directory, undefined, f.catalog).submit(f.input), /Lost response/);
+  const path = join(f.directory, 'selected-plates.json'), saved = JSON.parse(await readFile(path, 'utf8'));
+  // A record written by the 0.3.2 sample: material and color only.
+  saved.intent.plateRequirements = saved.intent.plateRequirements.map(r => ({ ...r, filaments: r.filaments.map(({ filamentId, ...rest }) => rest) }));
+  await writeFile(path, JSON.stringify(saved));
+  await createOrders(hive, f.directory, undefined, { get: async () => assert.fail('replay must not read the catalog') }).submit(f.input);
+  assert.deepEqual(calls.map(v => v.plate), [2, 7, 7]);
+  assert.deepEqual(calls[2].filaments, [{ sourceSlot: 0, material: 'PETG', color: '#296AAB' }]);
+  assert.equal(calls[2].idempotencyKey, saved.plates[1].idempotencyKey);
 });

@@ -1,5 +1,4 @@
 import { PrintHive } from "@printhive/api";
-import { createSearch, searchCapabilities } from "./search.mjs";
 import { createCatalog } from "./catalog.mjs";
 export function clientFromEnv() {
   const apiKey = process.env.PRINTHIVE_API_KEY;
@@ -17,7 +16,7 @@ export function clientFromEnv() {
     throw new Error("Use HTTPS or a loopback development API");
   }
   const hive = new PrintHive({ apiKey, baseUrl });
-  // The SDK has no release/cancel helpers. Keep credentials on this backend.
+  // SDK 0.4.0 has no release/cancel helpers. Keep credentials on this backend.
   async function control(requestId, action) {
     if (!["release", "cancel"].includes(action))
       throw new Error("Invalid action");
@@ -36,5 +35,5 @@ export function clientFromEnv() {
       );
     return response.json();
   }
-  return { hive, control, catalog: createCatalog({ baseUrl, apiKey, searchFilaments: searchCapabilities(hive).filaments ? createSearch(hive).filaments : undefined }) };
+  return { hive, control, catalog: createCatalog(hive) };
 }

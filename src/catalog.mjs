@@ -1,45 +1,55 @@
 import { materialIdPattern, normalizeColor } from './project-data.mjs';
-export function normalizeCatalogFilament(row) {
-  if (!row || typeof row !== 'object' || !materialIdPattern.test(row.id ?? '')) throw new Error('Invalid Hive catalog response');
+
+export const SEARCH_LIMIT = 20;
+export const MAX_SEARCH_OFFSET = 10000;
+const text = (value, max = 500) => typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : null;
+const refused = 'Hive does not accept this filament for print-job creation';
+
+function publicFields(row, id) {
+  if (!row || typeof row !== 'object' || !materialIdPattern.test(id ?? '')) throw new Error('Invalid Hive catalog response');
+  const brand = text(row.brand);
   const materialType = typeof row.material_type === 'string' ? row.material_type.trim() : '';
-  const listedColors = Array.isArray(row.metadata?.colors) ? row.metadata.colors : [];
-  const distinct = new Set(listedColors.map(normalizeColor).filter(Boolean));
-  const color = normalizeColor(row.color) ?? normalizeColor(row.metadata?.hex_code);
-  const ambiguous = distinct.size > 1 || (listedColors.length > 1 && listedColors.some((value) => !normalizeColor(value))) || row.metadata?.gradient === true;
-  const unavailableReason = !materialType ? 'This catalog filament has no material type' : ambiguous ? 'This catalog filament has multiple colors; a single-color requirement cannot represent it' : !color ? 'This catalog filament has no unambiguous hex color' : null;
-  const text = (name) => typeof row[name] === 'string' ? row[name].slice(0, 500) : null;
-  return { id: row.id, name: text('name') ?? 'Unnamed filament', brand: text('brand'), sku: text('sku'), materialType, color, selectable: unavailableReason === null, unavailableReason };
+  const name = text(row.name) ?? text([brand, materialType, text(row.metadata?.colorName)].filter(Boolean).join(' ')) ?? 'Unnamed filament';
+  return { id, name, brand, sku: text(row.sku), materialType, color: normalizeColor(row.color) };
 }
+
+export function normalizeSearchFilament(row) {
+  const filament = publicFields(row, row?.filamentId);
+  if (typeof row.acceptedByCreate !== 'boolean') throw new Error('Invalid Hive catalog response');
+  const unavailableReason = row.acceptedByCreate
+    ? (filament.materialType && filament.color ? null : 'Hive accepted this filament, but the search result has no material type or six-digit hex color to record')
+    : row.organization_id === 'global' ? `${refused}: it is a global catalog filament. Only organization-owned partner catalog rows are accepted; sync it to your catalog first.`
+      : !filament.materialType ? `${refused}: it has no material type.`
+        : !filament.color ? `${refused}: it has no six-digit hex color.`
+          : `${refused}: it is not a synced organization partner catalog row. Sync it with an external ID first.`;
+  return { ...filament, acceptedByCreate: row.acceptedByCreate, selectable: unavailableReason === null, unavailableReason };
+}
+
+export function normalizeCatalogFilament(row) {
+  const filament = publicFields(row, row?.id);
+  const unavailableReason = !filament.materialType ? 'This catalog filament has no material type' : !filament.color ? 'This catalog filament has no six-digit hex color' : null;
+  return { ...filament, selectable: unavailableReason === null, unavailableReason };
+}
+
 export function validateCatalogQuery(search) {
   const q = search.get('q') ?? '';
   const offset = Number(search.get('offset') ?? 0);
-  if (q.length > 100 || !Number.isInteger(offset) || offset < 0 || offset > 10000) throw new Error('Search is limited to 100 characters and offset 0–10000');
+  if (q.length > 100 || !Number.isInteger(offset) || offset < 0 || offset > MAX_SEARCH_OFFSET) throw new Error('Search is limited to 100 characters and offset 0–10000');
   return { q: q.trim(), offset };
 }
-export function createCatalog({ baseUrl, apiKey, fetchImpl = fetch, searchFilaments }) {
-  async function read(path) {
-    let response;
-    try { response = await fetchImpl(`${baseUrl.replace(/\/$/, '')}${path}`, { headers: { 'x-api-key': apiKey }, redirect: 'error', signal: AbortSignal.timeout(15000) }); }
-    catch { throw new Error('Hive catalog is unavailable; retry the search'); }
-    if (!response.ok) throw new Error(`Hive catalog returned HTTP ${response.status}`);
-    try { return await response.json(); } catch { throw new Error('Invalid Hive catalog response'); }
-  }
-  async function get(id) {
-    if (!materialIdPattern.test(id)) throw new Error('Invalid Hive filament ID');
-    const result = await read(`/v1/materials/${encodeURIComponent(id)}`);
-    const row = result.material ?? result;
-    const normalized = normalizeCatalogFilament(row);
-    if (normalized.id.toLowerCase() !== id.toLowerCase()) throw new Error('Hive catalog returned a different filament');
-    return normalized;
-  }
-  return { get, async search(search) {
-    const { q, offset } = validateCatalogQuery(search);
-    if (materialIdPattern.test(q)) return { materials: [await get(q)], total: 1, offset: 0, hasMore: false, mode: 'catalog-item-http' };
-    if (searchFilaments) return searchFilaments(search);
-    // TODO: Remove legacy material lookup after the SDK search minor release is approved and pinned.
-    const query = new URLSearchParams({ q, limit: '20', offset: String(offset) });
-    const result = await read(`/v1/materials?${query}`);
-    if (!Array.isArray(result.materials) || !Number.isInteger(result.total) || result.total < 0) throw new Error('Invalid Hive catalog response');
-    return { materials: result.materials.map(normalizeCatalogFilament), total: result.total, offset, mode: 'legacy-catalog', hasMore: offset + result.materials.length < result.total && offset + 20 <= 10000 };
-  } };
+
+export function createCatalog(hive) {
+  return {
+    async search(search) {
+      const { q, offset } = validateCatalogQuery(search);
+      const page = await hive.filaments.search({ query: q, limit: SEARCH_LIMIT, offset });
+      return { materials: page.filaments.map(normalizeSearchFilament), total: page.total, offset, hasMore: page.hasMore && offset + SEARCH_LIMIT <= MAX_SEARCH_OFFSET, mode: 'sdk-search', matchMode: page.matchMode };
+    },
+    async get(id) {
+      if (!materialIdPattern.test(id)) throw new Error('Invalid Hive filament ID');
+      const filament = normalizeCatalogFilament(await hive.filamentCatalog.get(id));
+      if (filament.id.toLowerCase() !== id.toLowerCase()) throw new Error('Hive catalog returned a different filament');
+      return filament;
+    },
+  };
 }

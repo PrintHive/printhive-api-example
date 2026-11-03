@@ -22,15 +22,19 @@ test('duplicate slots, missing colors, invalid mappings and unbound project data
   assert.throws(() => validateMappedInput({ ...input, mappings: [input.mappings[0], input.mappings[0]] }), /once/);
   assert.throws(() => validateMappedInput({ ...input, mappings: [{ sourceSlot: 0, materialId: 'SKU-123' }, input.mappings[0]] }), /valid Hive filament ID/);
 });
-test('selected catalog IDs resolve server-side into only supported SDK filament fields', async () => {
+test('selected catalog IDs resolve server-side into the catalog identity plus its material and color snapshot', async () => {
   const calls = [];
   const catalog = { get: async (id) => { calls.push(id); return { id, name: 'Actual catalog row', sku: 'SKU', materialType: id === idA ? 'PETG-CF' : 'PETG', color: id === idA ? '#112233' : '#FFFFFF', selectable: true }; } };
   const resolved = await resolveMappedInput({ ...input, filaments: [{ material: 'injected' }] }, catalog);
   assert.deepEqual(calls, [idA, idB]);
-  assert.deepEqual(resolved.filaments, [{ sourceSlot: 0, material: 'PETG-CF', color: '#112233' }, { sourceSlot: 3, material: 'PETG', color: '#FFFFFF' }]);
+  assert.deepEqual(resolved.filaments, [{ sourceSlot: 0, filamentId: idA, material: 'PETG-CF', color: '#112233' }, { sourceSlot: 3, filamentId: idB, material: 'PETG', color: '#FFFFFF' }]);
   assert.equal(resolved.catalogSelections[0].sku, 'SKU');
   assert.equal(resolved.projectData.sha256, 'a'.repeat(64));
   await assert.rejects(resolveMappedInput(input, { get: async () => ({ selectable: false, unavailableReason: 'No single color' }) }), /No single color/);
+  await assert.rejects(resolveMappedInput(input, { get: async () => ({ id: idB, materialType: 'PETG', color: '#FFFFFF', selectable: true }) }), /Source slot 0: Hive catalog returned a different filament/);
+  await assert.rejects(resolveMappedInput(input, { get: async () => ({ materialType: 'PETG', color: '#FFFFFF', selectable: true }) }), /different filament/);
+  const upper = await resolveMappedInput({ ...input, mappings: [{ sourceSlot: 3, materialId: idB.toUpperCase() }, { sourceSlot: 0, materialId: idA }] }, catalog);
+  assert.equal(upper.filaments[1].filamentId, idB.toUpperCase());
 });
 test('explicit named-printer placement hints preserve their own AMS indices, independent of source order', async () => {
   const mapped = { ...input, printer_id: 'mock-printer', mappings: [{ sourceSlot: 3, materialId: idB, targetSlot: { ams_id: 2, slot_id: 1 } }, { sourceSlot: 0, materialId: idA }] };

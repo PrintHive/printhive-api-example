@@ -51,7 +51,7 @@ function fixture(manual = false, options: { project?: typeof project } = {}) {
           production: false,
           maxUploadBytes: 16777216,
           sdk: {
-            version: "0.3.2",
+            version: "0.4.0",
             source: "installed-package",
             capabilities: { filamentCatalog: true, printJobRead: true },
           },
@@ -237,4 +237,46 @@ it("does not share a reused source slot when original material attributes differ
   await user.click(screen.getByRole("button", { name: "Configure plate 7" }));
   expect(screen.queryByText(/Requirement:/)).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Submit order" })).toBeDisabled();
+});
+
+it("copies material choices without copying named-printer placement hints", async () => {
+  const f = fixture(true);
+  render(<App />);
+  const user = userEvent.setup();
+  await screen.findByRole("button", { name: "Configure plate 2" });
+  await user.click(screen.getByRole("checkbox", { name: "Include plate 7" }));
+  await user.click(screen.getByRole("button", { name: "Configure plate 2" }));
+  await user.click(await screen.findByRole("button", { name: "Use Red PETG" }));
+  await user.type(
+    screen.getByLabelText("Printer ID (optional)"),
+    "22222222-2222-4222-8222-222222222222",
+  );
+  await user.click(screen.getByText("Optional placement on a named printer"));
+  await user.type(screen.getByLabelText("API AMS ID for source slot 0"), "0");
+  await user.type(screen.getByLabelText("API slot ID for source slot 0"), "1");
+  await user.click(
+    screen.getByRole("button", {
+      name: "Apply to selected plates using source slot 0",
+    }),
+  );
+  await user.click(screen.getByRole("button", { name: "Preview API request" }));
+  await waitFor(() =>
+    expect(f.preview()).toEqual(
+      expect.objectContaining({
+        plateMappings: [
+          {
+            plate: 2,
+            mappings: [
+              {
+                sourceSlot: 0,
+                materialId: red.id,
+                targetSlot: { ams_id: 0, slot_id: 1 },
+              },
+            ],
+          },
+          { plate: 7, mappings: [{ sourceSlot: 0, materialId: red.id }] },
+        ],
+      }),
+    ),
+  );
 });

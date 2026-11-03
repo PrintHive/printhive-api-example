@@ -3,6 +3,7 @@ import { z } from "zod";
 import { validateProjectData } from "../../src/project-data.mjs";
 import { mappedPlateInputs } from "../../src/mapped-plates.mjs";
 import { shouldPollJob } from "../../src/job-status.mjs";
+import { pruneSlots, sharedSourcePlates } from "./material-assignments";
 import {
   acceptedSchema,
   api,
@@ -22,6 +23,7 @@ import {
   type Order,
   type Plate,
   type Project,
+  type Source,
 } from "./api";
 
 type Active = { id: string; plates: number[]; options: RequestInit | null };
@@ -41,6 +43,7 @@ export function useOrderWorkflow() {
     Record<number, Record<number, Material>>
   >({});
   const [hints, setHints] = useState<Record<number, Record<number, Hint>>>({});
+  const [bulkNotice, setBulkNotice] = useState("");
   const [printer, setPrinter] = useState("");
   const [release, setRelease] = useState("manual");
   const [policy, setPolicy] = useState("wait");
@@ -65,9 +68,6 @@ export function useOrderWorkflow() {
   const previewController = useRef<AbortController | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const mounted = useRef(true);
-  const currentPlate = extracted
-    ? confirmed[plateNumber]
-    : project?.plates.find((p) => p.number === plateNumber);
   const currentSelections = selections[plateNumber] ?? {};
   const plateData = (number: number) =>
     extracted
@@ -87,12 +87,49 @@ export function useOrderWorkflow() {
   const complete =
     selectedPlates.length > 0 &&
     selectedPlates.every((number) => plateStatus(number) === "Ready to submit");
-  const currentUsage = extracted?.plates.find(
-    (p) => p.number === plateNumber,
-  )?.usage;
-  const draft =
-    drafts[plateNumber] ??
-    (currentUsage?.kind === "detected" ? (currentUsage.sourceSlots ?? []) : []);
+  const usageFor = (number: number) =>
+    extracted?.plates.find((p) => p.number === number)?.usage;
+  const draftFor = (number: number) => {
+    const usage = usageFor(number);
+    return (
+      drafts[number] ??
+      (usage?.kind === "detected" ? (usage.sourceSlots ?? []) : [])
+    );
+  };
+  const currentUsage = usageFor(plateNumber);
+  const draft = draftFor(plateNumber);
+  // Sources that mapping controls and bulk targets are built from: confirmed
+  // usage when present, otherwise the plate's selectable draft slots.
+  const plateSources = (number: number): Source[] => {
+    if (!extracted)
+      return project?.plates.find((p) => p.number === number)?.filaments ?? [];
+    const plate = confirmed[number];
+    if (plate) return plate.filaments;
+    const slots = draftFor(number);
+    return extracted.palette.flatMap((f) =>
+      slots.includes(f.sourceSlot) && f.selectable && f.color !== null
+        ? [
+            {
+              sourceSlot: f.sourceSlot,
+              name: f.name,
+              material: f.material,
+              color: f.color,
+            },
+          ]
+        : [],
+    );
+  };
+  const currentSources = plateSources(plateNumber);
+  const bulkTargets = (slot: number): number[] => {
+    const anchor = currentSources.find((s) => s.sourceSlot === slot);
+    if (!anchor || !currentSelections[slot]) return [];
+    return sharedSourcePlates(
+      anchor,
+      selectedPlates
+        .filter((number) => number !== plateNumber)
+        .map((number) => ({ number, sources: plateSources(number) })),
+    );
+  };
   const invalidate = useCallback(() => {
     previewGeneration.current++;
     previewController.current?.abort();
@@ -110,6 +147,7 @@ export function useOrderWorkflow() {
     setShowAll({});
     setSelections({});
     setHints({});
+    setBulkNotice("");
     setProjectError("");
     invalidate();
   }, [invalidate]);
@@ -247,7 +285,11 @@ export function useOrderWorkflow() {
       delete next[plateNumber];
       return next;
     });
-    setSelections((p) => ({ ...p, [plateNumber]: {} }));
+    if (!checked) {
+      setSelections((p) => pruneSlots(p, plateNumber, (s) => s !== slot));
+      setHints((p) => pruneSlots(p, plateNumber, (s) => s !== slot));
+    }
+    setBulkNotice("");
     invalidate();
   }
   function confirmUsage() {
@@ -258,9 +300,25 @@ export function useOrderWorkflow() {
     if (values.length !== draft.length || values.some((f) => !f.selectable))
       return;
     const plate = plateSchema.parse({ number: plateNumber, filaments: values });
+    const kept = (slot: number) => draft.includes(slot);
     setConfirmed((p) => ({ ...p, [plateNumber]: plate }));
-    setSelections((p) => ({ ...p, [plateNumber]: {} }));
-    setHints((p) => ({ ...p, [plateNumber]: {} }));
+    setSelections((p) => pruneSlots(p, plateNumber, kept));
+    setHints((p) => pruneSlots(p, plateNumber, kept));
+    invalidate();
+  }
+  function applyToMatching(slot: number) {
+    const material = currentSelections[slot];
+    const targets = bulkTargets(slot);
+    if (!material || !targets.length) return;
+    setSelections((p) => {
+      const next = { ...p };
+      for (const number of targets)
+        next[number] = { ...next[number], [slot]: material };
+      return next;
+    });
+    setBulkNotice(
+      `Applied ${[material.brand, material.name].filter(Boolean).join(" ")} to source slot ${slot} on ${targets.length === 1 ? "plate" : "plates"} ${targets.join(", ")} from plate ${plateNumber}.`,
+    );
     invalidate();
   }
   function currentInput(): MappedInput {
@@ -457,9 +515,12 @@ export function useOrderWorkflow() {
           : previous.filter((p) => p !== number),
       );
       if (checked) setPlateNumber(number);
+      setBulkNotice("");
       invalidate();
     },
-    currentPlate,
+    currentSources,
+    bulkTargets,
+    bulkNotice,
     confirmed,
     draft,
     currentUsage,
@@ -488,6 +549,7 @@ export function useOrderWorkflow() {
     importManifest,
     changeUsage,
     confirmUsage,
+    applyToMatching,
     preview,
     submit,
     action,
@@ -513,6 +575,7 @@ export function useOrderWorkflow() {
         ...p,
         [plateNumber]: { ...p[plateNumber], [slot]: material },
       }));
+      setBulkNotice("");
       invalidate();
     },
     setHint: (slot: number, hint: Hint) => {
