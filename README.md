@@ -60,11 +60,11 @@ Click **Preview API request**. Expect a one-based `plate` and zero-based `source
 
 ## 4. Upload and slice the plate
 
-Click **Submit order**. The backend saves the source bytes and one idempotency key per plate before this SDK call:
+Click **Submit order**. The backend saves the source bytes and one idempotency key per plate before calling the SDK. In `src/orders.mjs`, `record.source` names that private copy under `ORDER_DATA_DIR`, which defaults to `data/`. The call has this shape:
 
 ```ts
 const request = await client.printJobs.create({
-	file: "/srv/designs/cube.3mf",
+	file: record.source,
 	filename: "cube.3mf",
 	plate: 1,
 	filaments: [{ sourceSlot: 0, material: "PETG", color: "#000000" }],
@@ -76,7 +76,7 @@ const request = await client.printJobs.create({
 
 Expect a request ID and a `preparing` state. Hive inspects the source, slices the selected plate, and processes the output. Preparation can fail or hold for review. An accepted upload is not a created job.
 
-The UI reads progress once per second with `client.printJobs.getCreateRequest(requestId)`. When preparation permits manual review, expect `held` and the required action `manual_release_required`.
+The browser polls this backend's `GET /orders/{id}` once per second. The backend calls `client.printJobs.getCreateRequest(requestId)` for each plate. When preparation permits manual review, expect `held` and the required action `manual_release_required`.
 
 ## 5. Review the hold
 

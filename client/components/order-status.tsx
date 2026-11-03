@@ -58,9 +58,9 @@ export function OrderStatus({ flow }: { flow: OrderWorkflow }) {
           not a job.
         </SdkCall>
         <SdkCall call="HTTP POST /v1/print-jobs/create-requests/{requestId}/release or /cancel">
-          SDK 0.3.2 has no release or cancel helper. The backend authorizes only
-          a manual hold or cancels before creation. Other preparation holds need
-          corrected input.
+          SDK 0.3.2 has no release or cancel helper. This UI offers Release for
+          manual holds and Cancel before creation. The backend forwards the
+          action. Hive decides whether to accept it.
         </SdkCall>
         <SdkCall call="client.printJobs.get(jobId)">
           After creation, polls live status and unmet filament requirements.

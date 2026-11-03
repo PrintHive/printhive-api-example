@@ -62,11 +62,13 @@ export function FilamentMapping({
       setResults(data.materials);
       setPage(data);
       setStatus(
-        (data.mode === "legacy-catalog"
-          ? "SDK search unavailable: using legacy catalog HTTP lookup. "
-          : data.matchMode === "broadened"
-            ? "Hive broadened this query. "
-            : "") +
+        (data.mode === "catalog-item-http"
+          ? "HTTP GET /v1/materials/{id}. Direct catalog ID lookup. "
+          : data.mode === "legacy-catalog"
+            ? "SDK search unavailable: using legacy catalog HTTP lookup. "
+            : data.matchMode === "broadened"
+              ? "Hive broadened this query. "
+              : "") +
           (data.materials.length
             ? `${data.total} results · showing ${data.offset + 1}–${data.offset + data.materials.length}`
             : "No matching catalog filaments. Try a name, SKU, or ID."),

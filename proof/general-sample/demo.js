@@ -23,6 +23,10 @@ window.runSampleDemo = async ({ sdkSearch = false, cancel = false, rehearse = fa
   await say('Step 2 - Map a plate filament');
   await type('#search-1-0', 'black PETG'); await click('text:Search');
   await until(() => [...document.querySelectorAll('button')].some(e => e.textContent.trim() === 'Use Black PETG'));
+  await pause(1200);
+  await type('#search-1-0', '11111111-1111-4111-8111-111111111111'); await click('text:Search');
+  await until(() => document.body.innerText.includes('HTTP GET /v1/materials/{id}. Direct catalog ID lookup.'));
+  await view('#search-1-0'); await pause(1500);
   await click('text:Use Black PETG');
   await say('Step 3 - Choose a destination');
   await type('#printer-search', 'Boo P1S'); await click('text:Find printers'); await pause(1700);

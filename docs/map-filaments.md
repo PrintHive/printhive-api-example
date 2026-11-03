@@ -5,7 +5,10 @@
 3. Review **Source filaments used on this plate**. Use **Show all project filaments** to correct stale saved metadata.
 4. Click **Use these source filaments**.
 5. Search the Hive catalog for each source filament and select a result. Catalog presence does not establish printer compatibility or loaded inventory.
-6. Click **Preview API request** and review the source slots, catalog IDs, and target before submission.
+6. Review the selected catalog UUIDs in the mapping cards.
+7. Click **Preview API request**. Check the source slots, resolved material and color, and optional target data before submission.
+
+The browser sends the selected UUIDs in `mappings` during submission. The resolved preview does not include those UUIDs.
 
 If you already have authoritative per-plate usage, open **Advanced: supply known plate data**. Import or paste this JSON, then click **Use project data**:
 

@@ -213,3 +213,29 @@ it("searches printers by free text and uses the selected UUID", async () => {
     ),
   ).toBe(true);
 });
+
+it("labels an exact catalog ID read as HTTP without claiming SDK search is unavailable", async () => {
+  fixture((path) => {
+    if (path !== `/catalog?q=${material.id}&offset=0`) return;
+    return Response.json({
+      materials: [material],
+      total: 1,
+      offset: 0,
+      hasMore: false,
+      mode: "catalog-item-http",
+    });
+  });
+  render(<App />);
+  await screen.findByRole("button", { name: "Use Fixture PETG" });
+  const user = userEvent.setup();
+  const query = screen.getByLabelText(
+    "Find a Hive filament by name, SKU, or ID",
+  );
+  await user.clear(query);
+  await user.type(query, material.id);
+  await user.click(screen.getByRole("button", { name: "Search" }));
+  expect(
+    await screen.findByText(/HTTP GET \/v1\/materials\/\{id\}/),
+  ).toBeInTheDocument();
+  expect(screen.queryByText(/SDK search unavailable/)).not.toBeInTheDocument();
+});
