@@ -8,6 +8,8 @@ import { clientFromEnv } from '../../src/client.mjs';
 import { createOrderServer } from '../../src/server.mjs';
 
 const filament = { id: '11111111-1111-4111-8111-111111111111', name: 'Black PETG', brand: 'Bambu', sku: 'MOCK-PETG', material_type: 'PETG', color: '#000000', diameter: 1.75, category: 'filament', organization_id: null };
+const multiPlate = process.env.DEMO_PROJECT === 'plates';
+const catalogRows = multiPlate ? [{ ...filament, name: 'Red PETG', color: '#B44235' }, { ...filament, id: '33333333-3333-4333-8333-333333333333', name: 'Blue PETG', color: '#296AAB' }] : [filament];
 const printerId = '22222222-2222-4222-8222-222222222222';
 const requests = new Map();
 const events = [];
@@ -15,15 +17,16 @@ const upstream = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   const reply = (body, status = 200) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
   events.push(`${req.method} ${url.pathname}${url.search}`);
-  if (url.pathname === '/v1/materials/command-search') return reply({ materials: /nothing/i.test(url.searchParams.get('q')) ? [] : [filament], total: 1, hasMore: false, matchMode: 'strict', originalQuery: url.searchParams.get('q') });
+  if (url.pathname === '/v1/materials/command-search') return reply({ materials: /nothing/i.test(url.searchParams.get('q')) ? [] : catalogRows, total: catalogRows.length, hasMore: false, matchMode: 'strict', originalQuery: url.searchParams.get('q') });
   if (url.pathname === '/v1/search') return reply({ results: [{ type: 'printers', id: printerId, name: 'Boo mock printer', model: 'P1S', status: 'idle' }], total: 1, query: url.searchParams.get('q'), processingTimeMs: 1 });
-  if (url.pathname === '/v1/materials') return reply({ materials: [filament], total: 1 });
-  if (url.pathname === `/v1/materials/${filament.id}`) return reply(filament);
-  if (url.pathname === '/v1/print-jobs/42') return reply({ job: { id: 42, status: 'QUEUED', printer_id: printerId, print_options: { filament_route_state: 'waiting', filament_waiting_reasons: [{ code: 'filament_not_loaded', sourceSlot: 0, material: 'PETG', color: '#000000', cause: 'slot_empty', suggestedTargetSlot: { ams_id: 0, slot_id: 1 } }] } } });
+  if (url.pathname === '/v1/materials') return reply({ materials: catalogRows, total: catalogRows.length });
+  const catalogRow = catalogRows.find(row => url.pathname === `/v1/materials/${row.id}`);
+  if (catalogRow) return reply(catalogRow);
+  if (url.pathname === '/v1/print-jobs/42') return reply({ job: { id: 42, status: 'QUEUED', printer_id: printerId, print_options: { filament_route_state: 'waiting', filament_waiting_reasons: [{ code: 'filament_not_loaded', sourceSlot: 0, material: 'PETG', color: multiPlate ? '#B44235' : '#000000', cause: 'slot_empty', suggestedTargetSlot: { ams_id: 0, slot_id: 1 } }] } } });
   if (req.method === 'POST' && url.pathname === '/v1/print-jobs/create') {
     const chunks = []; for await (const chunk of req) chunks.push(chunk);
     const form = await new Response(Buffer.concat(chunks), { headers: { 'content-type': req.headers['content-type'] } }).formData();
-    if (form.get('file')?.name !== 'cube.3mf') return reply({ error: 'fixture_only' }, 422);
+    if (form.get('file')?.name !== (multiPlate ? 'valid.3mf' : 'cube.3mf')) return reply({ error: 'fixture_only' }, 422);
     const requestId = randomUUID();
     const record = { requestId, status: 'preparing', externalId: null, createdAt: new Date().toISOString(), job: null, requiredActions: [], error: null };
     requests.set(requestId, { record, since: Date.now(), manual: form.get('release') === 'manual' });

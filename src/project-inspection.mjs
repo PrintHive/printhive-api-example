@@ -8,6 +8,9 @@ const MAX_ENTRIES = 1000;
 const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024;
 const MAX_METADATA_BYTES = 16 * 1024 * 1024;
 const MAX_UPLOAD_BYTES = 16 * 1024 * 1024;
+const MAX_PREVIEW_BYTES = 512 * 1024;
+const MAX_PREVIEW_TOTAL_BYTES = 8 * 1024 * 1024;
+const previewPath = /^metadata\/plate_[1-9]\d*\.png$/;
 const documents = new Set(['metadata/project_settings.config', 'metadata/model_settings.config']);
 const invalid = (message) => new Error(message);
 function entryName(entry) {
@@ -38,12 +41,43 @@ function readDocument(zip, entry, budget, optional) {
     });
   });
 }
+function readPreview(zip, entry, budget) {
+  if (entry.uncompressedSize > MAX_PREVIEW_BYTES || budget.bytes + entry.uncompressedSize > MAX_PREVIEW_TOTAL_BYTES) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    zip.openReadStream(entry, (error, stream) => {
+      if (error) return resolve(null);
+      const chunks = []; let size = 0;
+      stream.on('data', (chunk) => {
+        size += chunk.length; budget.bytes += chunk.length;
+        if (size > MAX_PREVIEW_BYTES || budget.bytes > MAX_PREVIEW_TOTAL_BYTES) stream.destroy(new Error('Preview limit'));
+        else chunks.push(chunk);
+      });
+      stream.once('error', () => resolve(null));
+      stream.once('end', () => {
+        const bytes = Buffer.concat(chunks);
+        const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+        if (bytes.length < 45 || !bytes.subarray(0, 8).equals(signature) || bytes.readUInt32BE(8) !== 13 || bytes.toString('ascii', 12, 16) !== 'IHDR') return resolve(null);
+        const width = bytes.readUInt32BE(16), height = bytes.readUInt32BE(20);
+        if (!width || !height || width > 2048 || height > 2048 || width * height > 4 * 1024 * 1024) return resolve(null);
+        let offset = 8, pixels = false, ended = false;
+        while (offset + 12 <= bytes.length) {
+          const length = bytes.readUInt32BE(offset), type = bytes.toString('ascii', offset + 4, offset + 8);
+          if (length > bytes.length - offset - 12) return resolve(null);
+          if (type === 'IDAT') pixels = true;
+          offset += length + 12;
+          if (type === 'IEND') { ended = length === 0 && offset === bytes.length; break; }
+        }
+        resolve(pixels && ended ? `data:image/png;base64,${bytes.toString('base64')}` : null);
+      });
+    });
+  });
+}
 function readMetadata(bytes) {
   return new Promise((resolve, reject) => {
     yauzl.fromBuffer(bytes, { lazyEntries: true, strictFileNames: true, autoClose: false, validateEntrySizes: true }, (error, zip) => {
       if (error) return reject(invalid('Choose a valid ZIP-based 3MF project'));
       let count = 0; let done = false;
-      const names = new Set(); const result = new Map(); const budget = { bytes: 0 };
+      const names = new Set(); const result = new Map(); const budget = { bytes: 0 }; const previewBudget = { bytes: 0 };
       function fail(reason) { if (done) return; done = true; zip.close(); reject(reason); }
       zip.once('error', () => fail(invalid('Project archive is malformed')));
       zip.on('entry', (entry) => {
@@ -53,6 +87,7 @@ function readMetadata(bytes) {
           if (names.has(name)) throw invalid('Project archive contains duplicate paths');
           names.add(name);
           if (documents.has(name) || name === 'metadata/slice_info.config' || /^metadata\/plate_[1-9]\d*\.json$/.test(name)) result.set(name, await readDocument(zip, entry, budget, !documents.has(name)));
+          else if (previewPath.test(name)) result.set(name, await readPreview(zip, entry, previewBudget));
           if (!done) zip.readEntry();
         }).catch(fail);
       });
@@ -91,10 +126,12 @@ function platesFrom(text) {
     const parent = stack.at(-1); stack.push(tag.local);
     if (tag.local === 'plate') {
       if (current) throw invalid('Nested plate metadata is not supported');
-      current = { number: null };
+      current = { number: null, name: '', thumbnail: null };
     }
     if (current && tag.local === 'metadata' && parent === 'plate') {
       const attributes = Object.fromEntries(Object.values(tag.attributes).map((a) => [a.local, a.value]));
+      if (attributes.key === 'plater_name') current.name = (attributes.value ?? '').slice(0, 200);
+      if (attributes.key === 'thumbnail_file') { const path = (attributes.value ?? '').toLowerCase(); current.thumbnail = previewPath.test(path) ? path : ''; }
       if (attributes.key === 'plater_id') {
         if (current.number !== null || !/^[1-9]\d*$/.test(attributes.value ?? '')) throw invalid('Plate metadata has an invalid plate number');
         const number = Number(attributes.value);
@@ -106,7 +143,7 @@ function platesFrom(text) {
   parser.on('closetag', (tag) => {
     if (tag.local === 'plate') {
       if (!current?.number || numbers.has(current.number) || plates.length >= 256) throw invalid('Plate metadata needs unique plate numbers');
-      numbers.add(current.number); plates.push({ number: current.number }); current = null;
+      numbers.add(current.number); plates.push({ ...current }); current = null;
     }
     stack.pop();
   });
@@ -205,7 +242,7 @@ export async function inspectProject(bytes, filename) {
   const metadata = await readMetadata(bytes);
   const palette = paletteFrom(metadata.get('metadata/project_settings.config'));
   const sliceInfo = sliceInfoUsage(metadata.get('metadata/slice_info.config'), palette);
-  const plates = platesFrom(metadata.get('metadata/model_settings.config')).map((plate) => ({ ...plate, usage: detectedPlateUsage(plate, metadata, palette, sliceInfo) }));
+  const plates = platesFrom(metadata.get('metadata/model_settings.config')).map(({ number, name, thumbnail }) => ({ number, name, preview: thumbnail !== null && thumbnail !== `metadata/plate_${number}.png` ? null : metadata.get(`metadata/plate_${number}.png`) ?? null, usage: detectedPlateUsage({ number }, metadata, palette, sliceInfo) }));
   const warnings = ['This demo extracted plate numbers and the project palette. It does not decode painted material usage. Confirm which source filaments are used on each selected plate. This confirmation does not clear Hive inspection holds.'];
   if (!palette.length || palette.some((f) => !f.selectable)) warnings.push('Some project palette data is missing or incomplete. Plate choices are still available; supply the known source filaments under Advanced.');
   return {

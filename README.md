@@ -1,6 +1,6 @@
 # Slice a 3MF and create a Print Hive job
 
-We'll run a React app with a Node backend, choose a plate from a project 3MF, and submit it for cloud slicing. The backend uses `@printhive/api@0.3.2`. Each plate creates one request and, after preparation and release, one job.
+We'll run a React app with a Node backend, select plates from a project 3MF, and submit it for cloud slicing. The backend uses `@printhive/api@0.3.2`. Each plate creates one request and, after preparation and release, one job.
 
 Use an owned local Hive API with mock printers for this tutorial. A production destination can queue a real print. The sample defaults to manual release so you can review the prepared request first.
 
@@ -31,7 +31,7 @@ Open <http://127.0.0.1:5173>. Check the API destination banner. The Node backend
 
 Leave **Project 3MF** empty to use `fixtures/cube.3mf`. This synthetic project contains a small PETG cube for a P1S with a 0.4 mm nozzle. Choose **Plate 1** and keep **Manual · review first** selected.
 
-For your own project, choose a `.3mf` file. The backend reads its plate numbers and palette locally. Confirm the source filaments used on the selected plate. Saved slice metadata can be stale, so review the selected source slots.
+For your own project, choose a `.3mf` file. Select **Include plate** on each plate you want to submit. Click a preview to configure that plate, then confirm its source filaments. Each selected plate keeps its own mapping. The cards show saved PNG previews from the project. A plate with no usable image shows **No saved preview** and remains selectable. Saved previews and usage metadata can be stale.
 
 This step makes no SDK call. The file upload to Hive happens in `client.printJobs.create` after you submit. Metadata extraction neither slices the file nor clears Hive inspection holds.
 
@@ -56,7 +56,7 @@ const page = await client.printers.search({ query: "Boo P1S", limit: 20, offset:
 
 Select an owned mock printer, or leave **Printer ID** empty for Smart Queue assignment. A search result does not establish loaded filament or readiness.
 
-Click **Preview API request**. Expect a one-based `plate` and zero-based `sourceSlot` entries. The backend retains the selected `filamentId` as the mapping ID and reads its material and color. The create schema at PR #5039 does not yet accept `filaments[].filamentId`. Matching uses material and color rather than exact SKU identity.
+Repeat the mapping for every selected plate. Click **Preview API request**. Expect a `plates` list with one-based plate numbers and zero-based `sourceSlot` entries. The backend retains the selected `filamentId` as the mapping ID and reads its material and color. The create schema at PR #5039 does not yet accept `filaments[].filamentId`. Matching uses material and color rather than exact SKU identity.
 
 ## 4. Upload and slice the plate
 
@@ -86,7 +86,7 @@ SDK 0.3.2 has no release or cancel method. `src/client.mjs` provides a server-on
 
 ## 6. Follow the job
 
-After release, expect `created` and a job ID. The backend then reads the live job:
+Choose a plate in **Selected plate requests** to review its status and control that plate. After release, expect `created` and a job ID. The backend then reads the live job:
 
 ```ts
 const receipt = await client.printJobs.getCreateRequest(request.requestId);

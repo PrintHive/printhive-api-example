@@ -69,6 +69,13 @@ describe("React order workflow", () => {
     await user.click(screen.getByRole("button", { name: "Use Fixture PETG" }));
     expect(screen.getByRole("button", { name: "Submit order" })).toBeEnabled();
     expect(screen.getByLabelText("Release mode")).toHaveValue("manual");
+    await user.click(screen.getByRole("checkbox", { name: "Include plate 1" }));
+    expect(screen.getByRole("button", { name: "Submit order" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Configure plate 1" }));
+    expect(
+      screen.getByRole("checkbox", { name: "Include plate 1" }),
+    ).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Submit order" })).toBeDisabled();
     expect(calls.mock.calls.some(([, init]) => init?.method === "POST")).toBe(
       false,
     );
@@ -80,13 +87,17 @@ describe("React order workflow", () => {
       if (path !== "/orders/preview") return;
       preview = JSON.parse(String(init?.body));
       return Response.json({
-        plate: 1,
-        filaments: [
+        plates: [
           {
-            sourceSlot: 0,
-            material: "PETG",
-            color: "#39FF14",
-            targetSlot: { ams_id: 0, slot_id: 3 },
+            plate: 1,
+            filaments: [
+              {
+                sourceSlot: 0,
+                material: "PETG",
+                color: "#39FF14",
+                targetSlot: { ams_id: 0, slot_id: 3 },
+              },
+            ],
           },
         ],
       });
@@ -118,11 +129,16 @@ describe("React order workflow", () => {
       plates: [1],
       release: "manual",
       on_filament_mismatch: "wait",
-      mappings: [
+      plateMappings: [
         {
-          sourceSlot: 0,
-          materialId: material.id,
-          targetSlot: { ams_id: 0, slot_id: 3 },
+          plate: 1,
+          mappings: [
+            {
+              sourceSlot: 0,
+              materialId: material.id,
+              targetSlot: { ams_id: 0, slot_id: 3 },
+            },
+          ],
         },
       ],
     });
@@ -238,4 +254,159 @@ it("labels an exact catalog ID read as HTTP without claiming SDK search is unava
     await screen.findByText(/HTTP GET \/v1\/materials\/\{id\}/),
   ).toBeInTheDocument();
   expect(screen.queryByText(/SDK search unavailable/)).not.toBeInTheDocument();
+});
+
+it("selects preview cards, preserves per-plate mappings, and controls each submitted plate separately", async () => {
+  const blue = {
+    ...material,
+    id: "22222222-2222-4222-8222-222222222222",
+    name: "Blue PETG",
+    color: "#296AAB",
+  };
+  const savedPreview = "data:image/png;base64,iVBORw0KGgo=";
+  const phases: Record<number, string> = { 2: "held", 7: "held" };
+  const actions: string[] = [];
+  let submitted: unknown;
+  let id = "";
+  fixture((path, init) => {
+    if (path === "/project-data/inspect")
+      return Response.json({
+        filename: "plates.3mf",
+        sha256: "b".repeat(64),
+        plates: [
+          {
+            number: 2,
+            name: "Red part",
+            preview: savedPreview,
+            usage: { kind: "detected", sourceSlots: [0] },
+          },
+          {
+            number: 7,
+            name: "Blue part",
+            preview: null,
+            usage: { kind: "detected", sourceSlots: [1] },
+          },
+        ],
+        palette: [
+          {
+            sourceSlot: 0,
+            material: "PETG",
+            color: "#B44235",
+            selectable: true,
+          },
+          {
+            sourceSlot: 1,
+            material: "PETG",
+            color: "#296AAB",
+            selectable: true,
+          },
+        ],
+        warnings: [],
+      });
+    if (path.startsWith("/catalog?"))
+      return Response.json({
+        materials: [material, blue],
+        total: 2,
+        offset: 0,
+        hasMore: false,
+      });
+    if (path === "/orders") {
+      if (!(init?.body instanceof FormData))
+        throw new Error("Expected one multipart source upload");
+      const text = String(init.body.get("order"));
+      expect(text).not.toContain("data:image");
+      const input = JSON.parse(text);
+      submitted = input;
+      id = input.id;
+      return Response.json(
+        {
+          id,
+          requests: [
+            { plate: 2, requestId: "request-2" },
+            { plate: 7, requestId: "request-7" },
+          ],
+        },
+        { status: 202 },
+      );
+    }
+    if (path.startsWith("/orders/") && init?.method === "POST") {
+      actions.push(path);
+      const plate = Number(path.split("/")[3]);
+      phases[plate] = path.endsWith("/release") ? "created" : "cancelled";
+      return Response.json({ status: phases[plate] });
+    }
+    if (path === `/orders/${id}`)
+      return Response.json({
+        id,
+        plates: [2, 7].map((plate) => ({
+          plate,
+          requestId: `request-${plate}`,
+          status: phases[plate],
+          job: null,
+          requiredActions:
+            phases[plate] === "held"
+              ? [{ code: "manual_release_required" }]
+              : [],
+        })),
+      });
+  });
+  render(<App />);
+  const user = userEvent.setup();
+  await user.upload(
+    screen.getByLabelText("Project 3MF"),
+    new File(["synthetic archive"], "plates.3mf"),
+  );
+  expect(
+    await screen.findByRole("img", { name: "Saved preview of plate 2" }),
+  ).toHaveAttribute("src", savedPreview);
+  expect(
+    screen.getByRole("button", { name: "Configure plate 7" }),
+  ).toHaveTextContent("No saved preview");
+  await user.click(
+    screen.getByRole("button", { name: "Use these source filaments" }),
+  );
+  await user.click(
+    await screen.findByRole("button", { name: "Use Fixture PETG" }),
+  );
+  await user.click(screen.getByRole("checkbox", { name: "Include plate 7" }));
+  expect(screen.getByRole("button", { name: "Submit order" })).toBeDisabled();
+  await user.click(
+    screen.getByRole("button", { name: "Use these source filaments" }),
+  );
+  await user.click(
+    await screen.findByRole("button", { name: "Use Blue PETG" }),
+  );
+  await user.click(screen.getByRole("button", { name: "Configure plate 2" }));
+  expect(
+    screen.getByText(/Requirement: Fixture Fixture PETG/),
+  ).toBeInTheDocument();
+  await user.click(screen.getByRole("checkbox", { name: "Include plate 7" }));
+  expect(screen.getByText("1 of 2 plates selected")).toBeInTheDocument();
+  await user.click(screen.getByRole("checkbox", { name: "Include plate 7" }));
+  expect(
+    screen.getByText(/Requirement: Fixture Blue PETG/),
+  ).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Submit order" }));
+  await screen.findByRole("button", { name: "Plate 2 · held" });
+  expect(submitted).toMatchObject({
+    plates: [2, 7],
+    plateMappings: [
+      { plate: 2, mappings: [{ sourceSlot: 0, materialId: material.id }] },
+      { plate: 7, mappings: [{ sourceSlot: 1, materialId: blue.id }] },
+    ],
+  });
+  await user.click(screen.getByRole("button", { name: "Release" }));
+  await screen.findByRole("button", { name: "Plate 2 · created" });
+  expect(actions).toContain(`/orders/${id}/2/release`);
+  phases[7] = "preparing";
+  await waitFor(
+    () =>
+      expect(
+        screen.getByRole("button", { name: "Plate 7 · preparing" }),
+      ).toBeInTheDocument(),
+    { timeout: 2500 },
+  );
+  await user.click(screen.getByRole("button", { name: "Plate 7 · preparing" }));
+  await user.click(screen.getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(actions).toContain(`/orders/${id}/7/cancel`));
 });

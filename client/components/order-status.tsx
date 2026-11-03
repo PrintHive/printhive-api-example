@@ -23,7 +23,9 @@ import { Color, ReportedColors } from "./color";
 
 const actionSchema = z.object({ code: z.string().optional() });
 export function OrderStatus({ flow }: { flow: OrderWorkflow }) {
-  const receipt = flow.order?.plates[0];
+  const receipt =
+    flow.order?.plates.find((p) => p.plate === flow.statusPlate) ??
+    flow.order?.plates[0];
   const read = receipt?.jobRead;
   const job = read?.kind === "available" ? read.job : null;
   const reasons = job?.filament_waiting_reasons ?? [];
@@ -66,6 +68,32 @@ export function OrderStatus({ flow }: { flow: OrderWorkflow }) {
           After creation, polls live status and unmet filament requirements.
           Creation does not mean printing has started or finished.
         </SdkCall>
+        {flow.active && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">Selected plate requests</h3>
+            <div className="flex flex-wrap gap-2">
+              {flow.active.plates.map((plate) => (
+                <Button
+                  key={plate}
+                  type="button"
+                  variant={flow.statusPlate === plate ? "secondary" : "outline"}
+                  size="sm"
+                  disabled={flow.busy}
+                  aria-pressed={flow.statusPlate === plate}
+                  onClick={() => flow.setStatusPlate(plate)}
+                >
+                  Plate {plate} ·{" "}
+                  {flow.order?.plates.find((p) => p.plate === plate)?.status ??
+                    "Awaiting receipt"}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Review and control each plate separately. A retry preserves all
+              submitted requests and the remaining plate keys.
+            </p>
+          </div>
+        )}
         {!flow.active && (
           <div id="empty" className="py-8 text-center space-y-4">
             <div className="mx-auto grid size-12 place-content-center rounded-md border bg-muted">
@@ -124,6 +152,12 @@ export function OrderStatus({ flow }: { flow: OrderWorkflow }) {
                 </dd>
               </div>
             </dl>
+            {receipt?.status === "pending_submission" && (
+              <p className="text-xs text-muted-foreground">
+                This plate has not been submitted yet. Retry the same order to
+                resume with its saved key.
+              </p>
+            )}
             {receipt && (
               <>
                 <div className="space-y-2">
@@ -248,7 +282,7 @@ export function OrderStatus({ flow }: { flow: OrderWorkflow }) {
                   Release
                 </Button>
               )}
-              {!settled && (
+              {!settled && receipt?.requestId && (
                 <Button
                   id="cancel"
                   type="button"

@@ -21,6 +21,13 @@ export const extractionSchema = z.object({
   plates: z.array(
     z.object({
       number: z.number().int(),
+      name: z.string().optional(),
+      preview: z
+        .string()
+        .max(700000)
+        .regex(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/)
+        .nullable()
+        .optional(),
       usage: z
         .object({
           kind: z.string(),
@@ -106,6 +113,7 @@ export const jobReadSchema = z.discriminatedUnion("kind", [
 export const receiptSchema = z
   .object({
     status: z.string(),
+    plate: z.number().int().optional(),
     requestId: z.string().nullable().optional(),
     job: z.object({ id: z.number() }).passthrough().nullable().optional(),
     requiredActions: z.array(z.unknown()).default([]),
@@ -123,7 +131,7 @@ export const acceptedSchema = z.object({
     z.object({ plate: z.number(), requestId: z.string().nullable() }),
   ),
 });
-export const previewSchema = z.object({
+const plateRequestPreviewSchema = z.object({
   plate: z.number(),
   filaments: z.array(
     z.object({
@@ -135,6 +143,9 @@ export const previewSchema = z.object({
         .optional(),
     }),
   ),
+});
+export const previewSchema = z.object({
+  plates: z.array(plateRequestPreviewSchema),
 });
 const errorSchema = z.object({
   error: z.string().optional(),
@@ -153,10 +164,13 @@ export type MappedInput = {
   id: string;
   plates: number[];
   projectData: Project;
-  mappings: {
-    sourceSlot: number;
-    materialId: string;
-    targetSlot?: { ams_id: number; slot_id: number };
+  plateMappings: {
+    plate: number;
+    mappings: {
+      sourceSlot: number;
+      materialId: string;
+      targetSlot?: { ams_id: number; slot_id: number };
+    }[];
   }[];
   release: string;
   on_filament_mismatch: string;

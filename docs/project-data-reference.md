@@ -20,4 +20,10 @@ Inspection rejects malformed ZIPs, unsafe or duplicate paths, encrypted entries,
 
 A confirmed project has a filename, SHA-256, and plates. Each plate contains a unique positive `number` and source filaments with a unique zero-based `sourceSlot`, a material type, a six-digit hex color, and an optional name.
 
-The browser sends one selected plate and one mapping per confirmed source filament. `mappings[].materialId` is a Hive catalog UUID, distinct from `sourceSlot`. The backend verifies the filename and source bytes again before submission. It reads catalog material and color server-side and persists the resolved requirements for retries. Confirmation never approves Hive inspection holds.
+The browser sends selected plate numbers and `plateMappings`, with one mapping group per plate and one entry per confirmed source filament. The backend stores one source snapshot and separate resolved requirements and idempotency keys for each plate. `mappings[].materialId` is a Hive catalog UUID, distinct from `sourceSlot`. The backend verifies the filename and source bytes again before submission. It reads catalog material and color server-side and persists the resolved requirements for retries. Confirmation never approves Hive inspection holds.
+
+## Saved preview limits
+
+The extractor reads `Metadata/plate_N.png` for the exact plate number. A declared `thumbnail_file` must agree with that path. Previews are opaque PNG data, never mesh rendering or executable SVG. Each image has a 512 KiB limit, dimensions at most 2048 by 2048, and an 8 MiB combined read budget. Missing, invalid, oversized, and mismatched images become `null`; the plate stays selectable. The browser also falls back if PNG decoding fails.
+
+Preview data stays in the inspection response and never enters persisted print intent or the order payload. Mapped JSON previews retain the 64 KiB request limit. Legacy single-plate `mappings` requests and shared typed-filament CLI orders remain supported. A changed wire shape under an existing order ID conflicts; replay the unchanged input to recover old work.

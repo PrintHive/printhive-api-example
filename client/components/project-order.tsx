@@ -24,6 +24,7 @@ import {
 import { type OrderWorkflow } from "@/lib/use-order-workflow";
 import { Color, ReportedColors } from "./color";
 import { SdkCall } from "./sdk-call";
+import { PlateSelector } from "./plate-selector";
 import { PrinterSearch } from "./printer-search";
 import { FilamentMapping } from "./filament-mapping";
 
@@ -62,7 +63,7 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
           <div>
             <CardTitle className="text-xl">Prepare your order</CardTitle>
             <CardDescription>
-              One project, one plate, explicit filament requirements.
+              One project, selected plates, independent filament requirements.
             </CardDescription>
           </div>
         </div>
@@ -106,34 +107,19 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
                 </p>
               </div>
             </div>
+            {availablePlates.length > 0 && (
+              <PlateSelector
+                key={flow.project?.sha256 ?? "loading"}
+                plates={availablePlates}
+                selected={flow.selectedPlates}
+                focused={flow.plateNumber}
+                disabled={disabled || flow.extracting}
+                status={flow.plateStatus}
+                focus={flow.setPlate}
+                toggle={flow.togglePlate}
+              />
+            )}
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="plate">Plate</Label>
-                <NativeSelect
-                  id="plate"
-                  value={String(flow.plateNumber)}
-                  disabled={
-                    disabled || !availablePlates.length || flow.extracting
-                  }
-                  onChange={(e) => flow.setPlate(Number(e.target.value))}
-                >
-                  {!availablePlates.length && (
-                    <NativeSelectOption value="1">
-                      {flow.extracting
-                        ? "Reading project…"
-                        : "Project data not ready"}
-                    </NativeSelectOption>
-                  )}
-                  {availablePlates.map((plate) => (
-                    <NativeSelectOption
-                      key={plate.number}
-                      value={String(plate.number)}
-                    >
-                      Plate {plate.number}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              </div>
               <div className="space-y-2">
                 <Label htmlFor="release-mode">Release mode</Label>
                 <NativeSelect
@@ -289,7 +275,9 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <span className="step-index">02</span>
-                <h3 className="font-semibold">Map filament requirements</h3>
+                <h3 className="font-semibold">
+                  Map plate {flow.plateNumber} filament requirements
+                </h3>
               </div>
               <p className="text-xs leading-relaxed text-muted-foreground">
                 Choose one Hive filament per source. Job matching uses material
@@ -360,10 +348,10 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
             </div>
           </fieldset>
           <SdkCall call="client.printJobs.create({ file, filename, plate, filaments, printer_id, release, idempotencyKey })">
-            Hive uploads, inspects, and cloud-slices one plate. The server
-            resolves catalog IDs to material and color requirements. The server
-            saves the key before submission so an unchanged retry keeps the same
-            request.
+            Hive uploads, inspects, and cloud-slices each selected plate in a
+            separate SDK request. The server resolves catalog IDs to material
+            and color requirements. The server saves the key before submission
+            so an unchanged retry keeps the same request.
           </SdkCall>
           <div className="space-y-3 border-t pt-5">
             <Button
@@ -392,7 +380,7 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
                 ? "Resolving catalog requirements…"
                 : flow.payload
                   ? JSON.stringify(flow.payload, null, 2)
-                  : "Choose a Hive requirement for every source filament, then preview the API request."}
+                  : "Choose a Hive requirement for every source filament on every selected plate, then preview the API requests."}
             </pre>
             <Button
               id="submit"

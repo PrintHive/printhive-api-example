@@ -3,6 +3,7 @@ import { mkdir, readFile, open, rename } from "node:fs/promises";
 import { join, basename } from "node:path";
 import { PrintJobCreateStoppedError } from "@printhive/api";
 import { resolveMappedInput, validateMappedInput, validateTargetSlot } from "./project-data.mjs";
+import { mappedPlateInputs, resolveMappedPlates } from "./mapped-plates.mjs";
 import { readCreatedJob } from "./job-status.mjs";
 
 export function validateOrder(order) {
@@ -71,18 +72,22 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}, cat
     }
   }
   async function submit(input) {
+    const batch = input?.plateMappings !== undefined;
     const mapped = input?.projectData !== undefined || input?.mappings !== undefined;
-    if (mapped) validateMappedInput(input);
+    if (batch) mappedPlateInputs(input);
+    else if (mapped) validateMappedInput(input);
     else validateOrder(input);
     const bytes = await readFile(input.file);
     if (mapped) {
-      const { projectData, mappings, targetSlots } = validateMappedInput(input);
+      const { projectData, mappings, targetSlots } = validateMappedInput(batch ? mappedPlateInputs(input)[0] : input);
       if (createHash("sha256").update(bytes).digest("hex") !== projectData.sha256 || basename(input.file) !== projectData.filename)
         throw new Error("Project data belongs to a different file");
       let saved;
       try { saved = await load(input.id); }
       catch (error) { if (error.code !== "ENOENT") throw error; }
-      if (saved) {
+      if (batch) {
+        input = await resolveMappedPlates(input, catalog, saved?.intent);
+      } else if (saved) {
         const sort = (entries) => entries.sort(([left], [right]) => left - right);
         const placement = (target) => target ? [target.ams_id, target.slot_id] : null;
         const retained = saved.intent.catalogSelections?.map(({ sourceSlot, id }) => [sourceSlot, id.toLowerCase(), placement(saved.intent.filaments.find((f) => f.sourceSlot === sourceSlot)?.targetSlot)]);
@@ -95,12 +100,14 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}, cat
         input = await resolveMappedInput(input, catalog);
       }
     }
-    const order = validateOrder(input);
+    if (batch) { for (const requirement of input.plateRequirements) validateOrder({ ...input, filaments: requirement.filaments }); }
+    else validateOrder(input);
+    const order = input;
     const intent = {
       filename: basename(order.file),
       sha256: createHash("sha256").update(bytes).digest("hex"),
       plates: order.plates,
-      filaments: order.filaments,
+      ...(batch ? { plateMappings: order.plateMappings, plateRequirements: order.plateRequirements } : { filaments: order.filaments }),
       ...(order.projectData ? { projectData: order.projectData, catalogSelections: order.catalogSelections } : {}),
       release: order.release ?? "automatic",
       on_filament_mismatch: order.on_filament_mismatch ?? "wait",
@@ -140,7 +147,7 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}, cat
         file: record.source,
         filename: record.intent.filename,
         plate: item.plate,
-        filaments: record.intent.filaments,
+        filaments: record.intent.plateRequirements?.find(p => p.plate === item.plate)?.filaments ?? record.intent.filaments,
         release: record.intent.release,
         ...(record.intent.on_filament_mismatch ? { on_filament_mismatch: record.intent.on_filament_mismatch } : {}),
         ...(record.intent.printer_id ? { printer_id: record.intent.printer_id } : {}),

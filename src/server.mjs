@@ -2,6 +2,7 @@ import { serveWebAsset } from "./web-assets.mjs";
 import { createCatalogSync, catalogSyncError } from "./catalog-sync.mjs";
 import { createSearch } from "./search.mjs";
 import { sdkInfo } from "./sdk-info.mjs";
+import { mappedPlateInputs, resolveMappedPlates } from "./mapped-plates.mjs";
 import { inspectProject } from "./project-inspection.mjs";
 import { createHash } from "node:crypto";
 import { validateCatalogQuery } from "./catalog.mjs";
@@ -97,6 +98,13 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
       if (req.method === "POST" && pathname === "/orders/preview") {
         if (!catalog) return reply(503, { error: "Hive catalog is unavailable" });
         const input = JSON.parse(await readBody(req, 65536));
+        if (input.plateMappings !== undefined) {
+          mappedPlateInputs(input);
+          try {
+            const resolved = await resolveMappedPlates(input, catalog);
+            return reply(200, { plates: resolved.plateRequirements.map(({ plate, filaments }) => ({ plate, filaments })) });
+          } catch { return reply(400, { error: "A selected plate filament cannot form a requirement. Review all selected plate mappings." }); }
+        }
         validateMappedInput(input);
         try {
           const resolved = await resolveMappedInput(input, catalog);
@@ -117,7 +125,8 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
             return reply(400, { error: "Upload a nonempty .3mf file" });
           // Ignore browser paths and use a private temporary directory per upload.
           const filename = basename(file.name.replaceAll("\\", "/"));
-          if (input?.projectData !== undefined || input?.mappings !== undefined) validateMappedInput(input);
+          if (input?.plateMappings !== undefined) mappedPlateInputs(input);
+          else if (input?.projectData !== undefined || input?.mappings !== undefined) validateMappedInput(input);
           else validateOrder({ ...input, file: filename });
           temporary = await mkdtemp(join(tmpdir(), "printhive-upload-"));
           const source = join(temporary, filename);
@@ -134,7 +143,8 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
         } else return reply(400, { error: "Use application/json or multipart/form-data" });
         if (input?.projectData !== undefined || input?.mappings !== undefined) {
           if (!catalog) return reply(503, { error: "Hive catalog is unavailable" });
-          validateMappedInput(input);
+          if (input.plateMappings !== undefined) mappedPlateInputs(input);
+          else validateMappedInput(input);
           const bytes = await readFile(input.file);
           const sha256 = createHash("sha256").update(bytes).digest("hex");
           if (sha256 !== input.projectData.sha256.toLowerCase() || basename(input.file) !== input.projectData.filename)
