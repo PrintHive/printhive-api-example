@@ -178,3 +178,64 @@ describe("React order workflow", () => {
     expect(submitted[0]).toBe(submitted[1]);
   });
 });
+
+it("searches printers by free text and uses the selected UUID", async () => {
+  const calls = fixture((path) => {
+    if (!path.startsWith("/printers?")) return;
+    return Response.json({
+      printers: [
+        {
+          id: "22222222-2222-4222-8222-222222222222",
+          name: "Boo",
+          model: "P1S",
+          status: "idle",
+        },
+      ],
+      total: 1,
+      offset: 0,
+      hasMore: false,
+    });
+  });
+  render(<App />);
+  const user = userEvent.setup();
+  await user.type(
+    screen.getByLabelText("Find a printer by name or model"),
+    "Boo P1S",
+  );
+  await user.click(screen.getByRole("button", { name: "Find printers" }));
+  await user.click(await screen.findByRole("button", { name: "Use Boo" }));
+  expect(screen.getByLabelText("Printer ID (optional)")).toHaveValue(
+    "22222222-2222-4222-8222-222222222222",
+  );
+  expect(
+    calls.mock.calls.some(
+      ([path]) => String(path) === "/printers?q=Boo+P1S&offset=0",
+    ),
+  ).toBe(true);
+});
+
+it("labels an exact catalog ID read as HTTP without claiming SDK search is unavailable", async () => {
+  fixture((path) => {
+    if (path !== `/catalog?q=${material.id}&offset=0`) return;
+    return Response.json({
+      materials: [material],
+      total: 1,
+      offset: 0,
+      hasMore: false,
+      mode: "catalog-item-http",
+    });
+  });
+  render(<App />);
+  await screen.findByRole("button", { name: "Use Fixture PETG" });
+  const user = userEvent.setup();
+  const query = screen.getByLabelText(
+    "Find a Hive filament by name, SKU, or ID",
+  );
+  await user.clear(query);
+  await user.type(query, material.id);
+  await user.click(screen.getByRole("button", { name: "Search" }));
+  expect(
+    await screen.findByText(/HTTP GET \/v1\/materials\/\{id\}/),
+  ).toBeInTheDocument();
+  expect(screen.queryByText(/SDK search unavailable/)).not.toBeInTheDocument();
+});

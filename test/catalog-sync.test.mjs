@@ -3,18 +3,18 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createCatalogSync, validateCatalogBatch } from '../src/catalog-sync.mjs';
 import { createOrderServer } from '../src/server.mjs';
-const record = { externalId: 'printie-123', brand: 'Example', material: 'PETG', colorName: 'Green', colorHex: '#39ff14', sku: 'PETG-GREEN' };
+const record = { externalId: 'store-123', brand: 'Example', material: 'PETG', colorName: 'Green', colorHex: '#39ff14', sku: 'PETG-GREEN' };
 const id = '11111111-1111-4111-8111-111111111111';
 function row(input, uuid = id) {
   return { id: uuid, organization_id: 'not-browser-data', brand: input.brand, name: `${input.brand} ${input.material} ${input.colorName}`, material_type: input.material, color: input.colorHex, sku: input.sku, metadata: { externalId: input.externalId, colorName: input.colorName, replacementFilamentId: input.replacementFilamentId ?? null, private: 'not-browser-data' } };
 }
 test('batch validation canonicalizes aliases and rejects invalid imports before any SDK call', async () => {
-  assert.deepEqual(validateCatalogBatch({ records: [{ ...record, externalId: ' printie-123 ', hex: '#39FF14', colorHex: '#39ff14', sku: ' PETG-GREEN ' }] }), [{ ...record, externalId: 'printie-123', colorHex: '#39FF14', sku: 'PETG-GREEN' }]);
+  assert.deepEqual(validateCatalogBatch({ records: [{ ...record, externalId: ' store-123 ', hex: '#39FF14', colorHex: '#39ff14', sku: ' PETG-GREEN ' }] }), [{ ...record, externalId: 'store-123', colorHex: '#39FF14', sku: 'PETG-GREEN' }]);
   const { colorHex, ...withoutColor } = record;
   assert.equal(validateCatalogBatch([{ ...withoutColor, hex: '#112233' }])[0].colorHex, '#112233');
   let calls = 0;
   const sync = createCatalogSync({ filamentCatalog: { upsert: async () => { calls++; }, list() {}, get() {} } });
-  for (const invalid of [[], Array(21).fill(record), { log: { entries: [] } }, [{ ...withoutColor }], [{ ...record, hex: '#FFFFFF' }], [{ ...record, extra: 'unknown' }], [{ ...record, brand: ' ' }], [{ ...record, sku: '' }], [{ ...record, material: 'x'.repeat(101) }], [{ ...record, replacementFilamentId: {} }], [record, { ...record, externalId: ' printie-123 ' }]]) await assert.rejects(sync.upsert(invalid));
+  for (const invalid of [[], Array(21).fill(record), { log: { entries: [] } }, [{ ...withoutColor }], [{ ...record, hex: '#FFFFFF' }], [{ ...record, extra: 'unknown' }], [{ ...record, brand: ' ' }], [{ ...record, sku: '' }], [{ ...record, material: 'x'.repeat(101) }], [{ ...record, replacementFilamentId: {} }], [record, { ...record, externalId: ' store-123 ' }]]) await assert.rejects(sync.upsert(invalid));
   assert.equal(calls, 0);
   assert.equal(sync.preview([record]).records[0].externalId, record.externalId);
   assert.equal(calls, 0);
@@ -32,19 +32,19 @@ test('explicit sequential upserts retain stable identity and return partial outc
   assert.equal(first.outcomes[1].error, 'Hive filament catalog returned HTTP 403');
   assert.equal(JSON.stringify(first).includes('secret-key'), false);
   assert.equal(JSON.stringify(first).includes('not-browser-data'), false);
-  const again = await sync.upsert([{ ...record, colorHex: '#FFFFFF', replacementFilamentId: 'future-printie-id' }]);
+  const again = await sync.upsert([{ ...record, colorHex: '#FFFFFF', replacementFilamentId: 'future-store-id' }]);
   assert.equal(again.outcomes[0].filament.id, id);
   assert.equal(again.outcomes[0].filament.colorHex, '#FFFFFF');
-  assert.equal(again.outcomes[0].filament.replacementFilamentId, 'future-printie-id');
-  assert.deepEqual(events, ['printie-123', 'bad', 'printie-123']);
+  assert.equal(again.outcomes[0].filament.replacementFilamentId, 'future-store-id');
+  assert.deepEqual(events, ['store-123', 'bad', 'store-123']);
 });
 test('catalog list and read use SDK methods and sanitize permissions or malformed responses', async () => {
   const calls = [];
   const sync = createCatalogSync({ filamentCatalog: { upsert() {}, async list(query) { calls.push(query); return { materials: [row(record)], total: 21 }; }, async get(value) { calls.push(value); return row(record); } } });
-  const page = await sync.list(new URLSearchParams({ externalId: ' printie-123 ', sku: 'PETG-GREEN', offset: '0', limit: '20' }));
+  const page = await sync.list(new URLSearchParams({ externalId: ' store-123 ', sku: 'PETG-GREEN', offset: '0', limit: '20' }));
   assert.equal(page.hasMore, true);
-  assert.deepEqual(calls[0], { limit: 20, offset: 0, externalId: 'printie-123', sku: 'PETG-GREEN' });
-  assert.equal((await sync.get(id)).externalId, 'printie-123');
+  assert.deepEqual(calls[0], { limit: 20, offset: 0, externalId: 'store-123', sku: 'PETG-GREEN' });
+  assert.equal((await sync.get(id)).externalId, 'store-123');
   assert.equal(calls[1], id);
   await assert.rejects(sync.list(new URLSearchParams({ q: 'unsupported' })));
   await assert.rejects(sync.list(new URLSearchParams({ limit: '201' })));

@@ -1,7 +1,7 @@
 {
   "name": "printhive-api-example",
   "version": "1.0.0",
-  "description": "A partner backend that creates Print Hive jobs from a project 3MF",
+  "description": "Slice a project 3MF in the cloud and follow a Print Hive job",
   "scripts": {
     "start": "node src/server.mjs",
     "send-print": "node src/cli.mjs",

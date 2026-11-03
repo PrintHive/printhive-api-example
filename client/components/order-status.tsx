@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/card";
 import { waitingFilamentInstructions } from "../../src/job-status.mjs";
 import { type OrderWorkflow } from "@/lib/use-order-workflow";
+import { SdkCall } from "./sdk-call";
 import { Color, ReportedColors } from "./color";
 
 const actionSchema = z.object({ code: z.string().optional() });
@@ -52,6 +53,19 @@ export function OrderStatus({ flow }: { flow: OrderWorkflow }) {
         </div>
       </CardHeader>
       <CardContent className="pt-6 space-y-5">
+        <SdkCall call="client.printJobs.getCreateRequest(requestId)">
+          Polls preparation once per second. A held request needs review; it is
+          not a job.
+        </SdkCall>
+        <SdkCall call="HTTP POST /v1/print-jobs/create-requests/{requestId}/release or /cancel">
+          SDK 0.3.2 has no release or cancel helper. This UI offers Release for
+          manual holds and Cancel before creation. The backend forwards the
+          action. Hive decides whether to accept it.
+        </SdkCall>
+        <SdkCall call="client.printJobs.get(jobId)">
+          After creation, polls live status and unmet filament requirements.
+          Creation does not mean printing has started or finished.
+        </SdkCall>
         {!flow.active && (
           <div id="empty" className="py-8 text-center space-y-4">
             <div className="mx-auto grid size-12 place-content-center rounded-md border bg-muted">

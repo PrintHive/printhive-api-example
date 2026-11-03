@@ -18,6 +18,7 @@ test('catalog search encodes query and paging; exact IDs use the item endpoint',
   assert.equal(calls[1].url, `https://api.example/v1/materials/${id}`);
   assert.equal(exact.materials[0].id, id);
   assert.equal(exact.hasMore, false);
+  assert.equal(exact.mode, 'catalog-item-http');
   for (const query of [new URLSearchParams({ q: 'x'.repeat(101) }), new URLSearchParams({ offset: '-1' }), new URLSearchParams({ offset: '1.2' })]) await assert.rejects(catalog.search(query));
   assert.equal(calls.length, 2);
 });

@@ -16,7 +16,7 @@ export function validateCatalogQuery(search) {
   if (q.length > 100 || !Number.isInteger(offset) || offset < 0 || offset > 10000) throw new Error('Search is limited to 100 characters and offset 0–10000');
   return { q: q.trim(), offset };
 }
-export function createCatalog({ baseUrl, apiKey, fetchImpl = fetch }) {
+export function createCatalog({ baseUrl, apiKey, fetchImpl = fetch, searchFilaments }) {
   async function read(path) {
     let response;
     try { response = await fetchImpl(`${baseUrl.replace(/\/$/, '')}${path}`, { headers: { 'x-api-key': apiKey }, redirect: 'error', signal: AbortSignal.timeout(15000) }); }
@@ -34,10 +34,12 @@ export function createCatalog({ baseUrl, apiKey, fetchImpl = fetch }) {
   }
   return { get, async search(search) {
     const { q, offset } = validateCatalogQuery(search);
-    if (materialIdPattern.test(q)) return { materials: [await get(q)], total: 1, offset: 0, hasMore: false };
+    if (materialIdPattern.test(q)) return { materials: [await get(q)], total: 1, offset: 0, hasMore: false, mode: 'catalog-item-http' };
+    if (searchFilaments) return searchFilaments(search);
+    // TODO: Remove legacy material lookup after the SDK search minor release is approved and pinned.
     const query = new URLSearchParams({ q, limit: '20', offset: String(offset) });
     const result = await read(`/v1/materials?${query}`);
     if (!Array.isArray(result.materials) || !Number.isInteger(result.total) || result.total < 0) throw new Error('Invalid Hive catalog response');
-    return { materials: result.materials.map(normalizeCatalogFilament), total: result.total, offset, hasMore: offset + result.materials.length < result.total && offset + 20 <= 10000 };
+    return { materials: result.materials.map(normalizeCatalogFilament), total: result.total, offset, mode: 'legacy-catalog', hasMore: offset + result.materials.length < result.total && offset + 20 <= 10000 };
   } };
 }

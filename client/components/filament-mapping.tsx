@@ -1,3 +1,4 @@
+import { SdkCall } from "./sdk-call";
 import { useEffect, useRef, useState } from "react";
 import { Check, Search, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -61,9 +62,16 @@ export function FilamentMapping({
       setResults(data.materials);
       setPage(data);
       setStatus(
-        data.materials.length
-          ? `${data.total} results · showing ${data.offset + 1}–${data.offset + data.materials.length}`
-          : "No matching catalog filaments. Try a name, SKU, or ID.",
+        (data.mode === "catalog-item-http"
+          ? "HTTP GET /v1/materials/{id}. Direct catalog ID lookup. "
+          : data.mode === "legacy-catalog"
+            ? "SDK search unavailable: using legacy catalog HTTP lookup. "
+            : data.matchMode === "broadened"
+              ? "Hive broadened this query. "
+              : "") +
+          (data.materials.length
+            ? `${data.total} results · showing ${data.offset + 1}–${data.offset + data.materials.length}`
+            : "No matching catalog filaments. Try a name, SKU, or ID."),
       );
     } catch (e) {
       if (!controller.signal.aborted && ownVersion === version.current)
@@ -142,6 +150,12 @@ export function FilamentMapping({
       )}
       {finderVisible && (
         <div id={finderId} className="space-y-4">
+          <SdkCall call="client.filaments.search({ query, limit: 20, offset })">
+            Hive searches catalog filaments by free text, such as black PETG or
+            bambu red. Select a catalog filamentId; the server resolves it to
+            the material and color accepted by create. SDK 0.3.2 uses the
+            labeled legacy HTTP lookup until the search release is installed.
+          </SdkCall>
           <div className="space-y-2">
             <Label htmlFor={`search-${plateNumber}-${source.sourceSlot}`}>
               Find a Hive filament by name, SKU, or ID
@@ -151,6 +165,7 @@ export function FilamentMapping({
                 id={`search-${plateNumber}-${source.sourceSlot}`}
                 type="search"
                 maxLength={100}
+                placeholder="black PETG or bambu red"
                 value={query}
                 disabled={disabled}
                 onChange={(e) => {

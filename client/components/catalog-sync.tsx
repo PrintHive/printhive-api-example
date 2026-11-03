@@ -223,7 +223,7 @@ export function CatalogSync({ config }: { config: Config | null }) {
       <summary className="flex cursor-pointer items-center justify-between gap-3 p-5 font-semibold">
         <span className="flex items-center gap-3">
           <Database className="size-4" />
-          Sync Printie filament catalog
+          Sync your store filament catalog
         </span>
         <ChevronDown className="size-4 text-muted-foreground" />
       </summary>
@@ -246,7 +246,7 @@ export function CatalogSync({ config }: { config: Config | null }) {
         <fieldset disabled={busy} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="sync-file">
-              Import Printie catalog records as JSON
+              Import your store catalog records as JSON
             </Label>
             <Input
               id="sync-file"
@@ -285,7 +285,7 @@ export function CatalogSync({ config }: { config: Config | null }) {
               value={input}
               className="font-mono text-xs"
               placeholder={
-                '[{"externalId":"printie-filament-123","brand":"Example","material":"PETG","colorName":"Green","colorHex":"#39FF14","sku":"PETG-GREEN"}]'
+                '[{"externalId":"store-filament-123","brand":"Example","material":"PETG","colorName":"Green","colorHex":"#39FF14","sku":"PETG-GREEN"}]'
               }
               onChange={(e) => invalidate(e.target.value)}
             />
@@ -390,7 +390,7 @@ export function CatalogSync({ config }: { config: Config | null }) {
           <h3 className="font-semibold">Read synced Hive bindings</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="sync-filter-external">Printie external ID</Label>
+              <Label htmlFor="sync-filter-external">your store external ID</Label>
               <Input
                 id="sync-filter-external"
                 maxLength={200}

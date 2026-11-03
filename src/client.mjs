@@ -1,4 +1,5 @@
 import { PrintHive } from "@printhive/api";
+import { createSearch, searchCapabilities } from "./search.mjs";
 import { createCatalog } from "./catalog.mjs";
 export function clientFromEnv() {
   const apiKey = process.env.PRINTHIVE_API_KEY;
@@ -35,5 +36,5 @@ export function clientFromEnv() {
       );
     return response.json();
   }
-  return { hive, control, catalog: createCatalog({ baseUrl, apiKey }) };
+  return { hive, control, catalog: createCatalog({ baseUrl, apiKey, searchFilaments: searchCapabilities(hive).filaments ? createSearch(hive).filaments : undefined }) };
 }
