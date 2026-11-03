@@ -39,7 +39,7 @@ const extraction = {
   warnings: [],
 };
 afterEach(() => vi.unstubAllGlobals());
-function fixture(manual = false) {
+function fixture(manual = false, options: { project?: typeof project } = {}) {
   let preview: unknown;
   vi.stubGlobal(
     "fetch",
@@ -58,9 +58,18 @@ function fixture(manual = false) {
         });
       if (url === "/project-data")
         return Response.json(
-          manual ? project : { ...project, plates: [project.plates[0]] },
+          manual
+            ? (options.project ?? project)
+            : { ...project, plates: [project.plates[0]] },
         );
-      if (url === "/project-data/inspect") return Response.json(extraction);
+      if (url === "/project-data/inspect") {
+        const file =
+          init?.body instanceof FormData ? init.body.get("file") : null;
+        return Response.json({
+          ...extraction,
+          filename: file && typeof file !== "string" ? file.name : "shared.3mf",
+        });
+      }
       if (url.startsWith("/catalog?"))
         return Response.json({
           materials: [red, blue],
@@ -135,7 +144,7 @@ it("shares a source assignment across plates and keeps a later individual overri
   await user.click(await screen.findByRole("button", { name: "Use Red PETG" }));
   await user.click(
     screen.getByRole("button", {
-      name: "Apply to all plates using source slot 0",
+      name: "Apply to selected plates using source slot 0",
     }),
   );
   await user.click(screen.getByRole("button", { name: "Configure plate 7" }));
@@ -161,4 +170,71 @@ it("shares a source assignment across plates and keeps a later individual overri
       ],
     }),
   );
+});
+
+it("keeps bulk assignments through late confirmation and clears them for another project", async () => {
+  fixture();
+  render(<App />);
+  const user = userEvent.setup();
+  await user.upload(
+    screen.getByLabelText("Project 3MF"),
+    new File(["synthetic"], "shared.3mf"),
+  );
+  await user.click(
+    await screen.findByRole("checkbox", { name: "Include plate 7" }),
+  );
+  await user.click(screen.getByRole("button", { name: "Configure plate 2" }));
+  await user.click(await screen.findByRole("button", { name: "Use Red PETG" }));
+  await user.click(
+    screen.getByRole("button", {
+      name: "Apply to selected plates using source slot 0",
+    }),
+  );
+  expect(screen.getByRole("button", { name: "Submit order" })).toBeDisabled();
+  await user.click(
+    screen.getByRole("button", { name: "Use these source filaments" }),
+  );
+  await user.click(screen.getByRole("button", { name: "Configure plate 7" }));
+  expect(screen.getByText("Requirement: Fixture Red PETG")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Submit order" })).toBeDisabled();
+  await user.click(
+    screen.getByRole("button", { name: "Use these source filaments" }),
+  );
+  expect(screen.getByRole("button", { name: "Submit order" })).toBeEnabled();
+  await user.upload(
+    screen.getByLabelText("Project 3MF"),
+    new File(["another project"], "new.3mf"),
+  );
+  await screen.findByRole("button", { name: "Use Red PETG" });
+  expect(screen.queryByText(/Requirement:/)).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Submit order" })).toBeDisabled();
+});
+
+it("does not share a reused source slot when original material attributes differ", async () => {
+  fixture(true, {
+    project: {
+      ...project,
+      plates: project.plates.slice(0, 2).map((plate) => ({
+        ...plate,
+        filaments: plate.filaments.map((f) => ({
+          ...f,
+          material: plate.number === 7 ? "PLA" : "PETG",
+        })),
+      })),
+    },
+  });
+  render(<App />);
+  const user = userEvent.setup();
+  await screen.findByRole("button", { name: "Configure plate 2" });
+  await user.click(screen.getByRole("checkbox", { name: "Include plate 7" }));
+  await user.click(screen.getByRole("button", { name: "Configure plate 2" }));
+  await user.click(await screen.findByRole("button", { name: "Use Red PETG" }));
+  expect(
+    screen.queryByRole("button", {
+      name: "Apply to selected plates using source slot 0",
+    }),
+  ).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Configure plate 7" }));
+  expect(screen.queryByText(/Requirement:/)).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Submit order" })).toBeDisabled();
 });
