@@ -22,6 +22,7 @@ export default defineConfig({
         path("./node_modules"),
         path("./assets-public"),
         path("./src/project-data.mjs"),
+        path("./src/mapped-plates.mjs"),
         path("./src/job-status.mjs"),
       ],
       deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**", "**/data/**"],

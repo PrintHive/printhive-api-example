@@ -161,11 +161,11 @@ test('mapped placement is pinned before upload and changing a hint cannot silent
   const projectData = { filename: 'project.3mf', sha256: createHash('sha256').update(await readFile(input.file)).digest('hex'), plates: [{ number: 2, filaments: input.filaments }] };
   const mapped = { ...input, projectData, mappings: [{ sourceSlot: 0, materialId: id, targetSlot: { ams_id: 0, slot_id: 3 } }] };
   const hive = { printJobs: { create: async value => { calls.push(value); if (calls.length === 1) throw new Error('lost response'); return { requestId: 'request' }; } } };
-  const catalog = { get: async () => ({ id, materialType: 'PETG', color: '#000000', selectable: true }) };
-  await assert.rejects(createOrders(hive, directory, undefined, catalog).submit(mapped), /lost/);
-  const restarted = createOrders(hive, directory, undefined, { get: async () => assert.fail('replay must use saved catalog selection') });
+  await assert.rejects(createOrders(hive, directory).submit(mapped), /lost/);
+  const restarted = createOrders(hive, directory);
   await restarted.submit(mapped);
-  assert.deepEqual(calls[0].filaments[0].targetSlot, { ams_id: 0, slot_id: 3 });
+  assert.deepEqual(calls[0].filaments, [{ sourceSlot: 0, filamentId: id, targetSlot: { ams_id: 0, slot_id: 3 } }]);
+  assert.deepEqual(calls[1].filaments, calls[0].filaments);
   assert.equal(calls[0].idempotencyKey, calls[1].idempotencyKey);
   await assert.rejects(restarted.submit({ ...mapped, mappings: [{ ...mapped.mappings[0], targetSlot: { ams_id: 0, slot_id: 2 } }] }), /conflicts/);
   assert.equal(calls.length, 2);

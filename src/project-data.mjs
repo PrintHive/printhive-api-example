@@ -51,17 +51,13 @@ export function validateMappedInput(input) {
   }
   return { projectData: { filename: input.projectData.filename, sha256: input.projectData.sha256.toLowerCase(), ...manifest }, plate, mappings, targetSlots };
 }
-export async function resolveMappedInput(input, catalog) {
+export function resolveMappedInput(input) {
   const { projectData, plate, mappings, targetSlots } = validateMappedInput(input);
-  const selections = await Promise.all(plate.filaments.map(async (source) => {
-    const filament = await catalog.get(mappings.get(source.sourceSlot));
-    if (!filament.selectable) throw new Error(`Source slot ${source.sourceSlot}: ${filament.unavailableReason}`);
-    return { sourceSlot: source.sourceSlot, ...filament };
-  }));
+  const catalogSelections = plate.filaments.map(({ sourceSlot }) => ({ sourceSlot, id: mappings.get(sourceSlot) }));
   return {
     ...input,
     projectData,
-    catalogSelections: selections,
-    filaments: selections.map((f) => ({ sourceSlot: f.sourceSlot, material: f.materialType, color: f.color, ...(targetSlots.has(f.sourceSlot) ? { targetSlot: targetSlots.get(f.sourceSlot) } : {}) })),
+    catalogSelections,
+    filaments: catalogSelections.map(({ sourceSlot, id }) => ({ sourceSlot, filamentId: id, ...(targetSlots.has(sourceSlot) ? { targetSlot: targetSlots.get(sourceSlot) } : {}) })),
   };
 }

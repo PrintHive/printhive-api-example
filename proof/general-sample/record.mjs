@@ -6,7 +6,6 @@ const { chromium } = require(process.env.PLAYWRIGHT_PACKAGE ?? 'playwright');
 const demoUrl = new URL(process.env.DEMO_URL ?? 'http://127.0.0.1:3086');
 if (demoUrl.hostname !== '127.0.0.1') throw new Error('Record only the owned loopback fixture');
 const browser = await chromium.launch({ headless: true });
-const sdkSearch = process.argv.includes('--search-sdk');
 const rehearse = process.argv.includes('--rehearse');
 const script = await readFile(new URL('./demo.js', import.meta.url), 'utf8');
 try {
@@ -21,10 +20,10 @@ try {
     await page.goto(demoUrl.href);
     await page.waitForSelector('#search-1-0');
     await page.evaluate(script);
-    const result = await page.evaluate(options => window.runSampleDemo(options), { sdkSearch, rehearse, cancel: name === 'mobile' });
+    const result = await page.evaluate(options => window.runSampleDemo(options), { rehearse, cancel: name === 'mobile' });
     if (errors.length) throw new Error(errors.join('\n'));
     console.log(JSON.stringify({ viewport: name, ...result, errors }));
     await context.close();
-    if (!rehearse) await page.video().saveAs(resolve(`proof/general-sample/${sdkSearch ? 'search-sdk' : 'registry'}-${name}.webm`));
+    if (!rehearse) await page.video().saveAs(resolve(`data/general-sample-video/sdk-0.4.1-${name}.webm`));
   }
 } finally { await browser.close(); }

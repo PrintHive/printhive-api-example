@@ -13,9 +13,11 @@ npm run send-print -- release REQUEST_ID
 npm run send-print -- cancel ANOTHER_REQUEST_ID
 ```
 
-To select several plates, set `plates` to their one-based numbers. Supply zero-based source slots with material and hex color requirements. Use separate order IDs when plates need different mappings. To pin a printer, set `printer_id`.
+To select several plates, set `plates` to their one-based numbers. Supply zero-based source slots with a catalog `filamentId`, or with material and hex color requirements. These CLI filament requirements apply to every listed plate. Use the browser for independent mappings per plate. To pin a printer, set `printer_id`.
 
 After a transport failure or restart, rerun the same command with unchanged input. Keep `data/` across restarts. A changed file, mapping, release policy, or target needs a new order ID. Read status after a lost release or cancel response before repeating that action.
+
+If creation returns 503 `catalog_store_failed`, retry the unchanged order after the catalog service recovers. Keep the order ID and source bytes. See the [catalog creation error reference](sdk-upgrade.md#catalog-creation-errors) for other failures.
 
 ## Run the built HTTP app
 

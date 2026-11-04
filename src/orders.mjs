@@ -2,8 +2,19 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, open, rename } from "node:fs/promises";
 import { join, basename } from "node:path";
 import { PrintJobCreateStoppedError } from "@printhive/api";
-import { resolveMappedInput, validateMappedInput, validateTargetSlot } from "./project-data.mjs";
+import { materialIdPattern, resolveMappedInput, validateMappedInput, validateTargetSlot } from "./project-data.mjs";
+import { mappedPlateInputs, resolveMappedPlates } from "./mapped-plates.mjs";
 import { readCreatedJob } from "./job-status.mjs";
+
+const hexColor = /^#[a-fA-F0-9]{6}$/;
+const typed = (value) => typeof value === "string" && value.length > 0;
+// A requirement names a catalog filament, whose material and color Hive derives, or states both
+// itself. Explicit values beside a catalog ID travel unchanged for Hive's exact comparison.
+function validRequirement(f) {
+  if (!f || !Number.isInteger(f.sourceSlot) || f.sourceSlot < 0 || f.sourceSlot > 255) return false;
+  if (f.filamentId === undefined) return typed(f.material) && hexColor.test(f.color);
+  return materialIdPattern.test(f.filamentId) && (f.material === undefined || typed(f.material)) && (f.color === undefined || hexColor.test(f.color));
+}
 
 export function validateOrder(order) {
   if (
@@ -17,16 +28,7 @@ export function validateOrder(order) {
     !Array.isArray(order.filaments) ||
     !order.filaments.length ||
     new Set(order.filaments.map((f) => f?.sourceSlot)).size !== order.filaments.length ||
-    !order.filaments.every(
-      (f) =>
-        f &&
-        Number.isInteger(f.sourceSlot) &&
-        f.sourceSlot >= 0 &&
-        f.sourceSlot <= 255 &&
-        typeof f.material === "string" &&
-        f.material.length > 0 &&
-        /^#[a-fA-F0-9]{6}$/.test(f.color),
-    ) ||
+    !order.filaments.every(validRequirement) ||
     (order.printer_id !== undefined &&
       (typeof order.printer_id !== "string" || !order.printer_id.trim())) ||
     (order.release !== undefined &&
@@ -34,7 +36,7 @@ export function validateOrder(order) {
     (order.on_filament_mismatch !== undefined && !["wait", "reject"].includes(order.on_filament_mismatch))
   ) {
     throw new Error(
-      "Invalid order: supply id, file, unique positive plates, and typed filaments",
+      "Invalid order: supply id, file, unique positive plates, and filaments with a catalog filamentId or a material and color",
     );
   }
   for (const filament of order.filaments) validateTargetSlot(filament.targetSlot);
@@ -43,7 +45,7 @@ export function validateOrder(order) {
 
 // One process owns this directory. Calls serialize, including concurrent HTTP retries.
 // Each immutable intent includes a private copy of the source bytes.
-export function createOrders(hive, directory = "data", onReceipt = () => {}, catalog) {
+export function createOrders(hive, directory = "data", onReceipt = () => {}) {
   let queue = Promise.resolve();
   const path = (id) => {
     if (!/^[a-zA-Z0-9_-]{1,80}$/.test(id)) throw new Error("Invalid order id");
@@ -71,18 +73,22 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}, cat
     }
   }
   async function submit(input) {
+    const batch = input?.plateMappings !== undefined;
     const mapped = input?.projectData !== undefined || input?.mappings !== undefined;
-    if (mapped) validateMappedInput(input);
+    if (batch) mappedPlateInputs(input);
+    else if (mapped) validateMappedInput(input);
     else validateOrder(input);
     const bytes = await readFile(input.file);
     if (mapped) {
-      const { projectData, mappings, targetSlots } = validateMappedInput(input);
+      const { projectData, mappings, targetSlots } = validateMappedInput(batch ? mappedPlateInputs(input)[0] : input);
       if (createHash("sha256").update(bytes).digest("hex") !== projectData.sha256 || basename(input.file) !== projectData.filename)
         throw new Error("Project data belongs to a different file");
       let saved;
       try { saved = await load(input.id); }
       catch (error) { if (error.code !== "ENOENT") throw error; }
-      if (saved) {
+      if (batch) {
+        input = resolveMappedPlates(input, saved?.intent);
+      } else if (saved) {
         const sort = (entries) => entries.sort(([left], [right]) => left - right);
         const placement = (target) => target ? [target.ams_id, target.slot_id] : null;
         const retained = saved.intent.catalogSelections?.map(({ sourceSlot, id }) => [sourceSlot, id.toLowerCase(), placement(saved.intent.filaments.find((f) => f.sourceSlot === sourceSlot)?.targetSlot)]);
@@ -91,16 +97,17 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}, cat
           throw new Error("Order id conflicts with stored intent");
         input = { ...input, projectData, filaments: saved.intent.filaments, catalogSelections: saved.intent.catalogSelections };
       } else {
-        if (!catalog) throw new Error("Hive catalog is unavailable");
-        input = await resolveMappedInput(input, catalog);
+        input = resolveMappedInput(input);
       }
     }
-    const order = validateOrder(input);
+    if (batch) { for (const requirement of input.plateRequirements) validateOrder({ ...input, filaments: requirement.filaments }); }
+    else validateOrder(input);
+    const order = input;
     const intent = {
       filename: basename(order.file),
       sha256: createHash("sha256").update(bytes).digest("hex"),
       plates: order.plates,
-      filaments: order.filaments,
+      ...(batch ? { plateMappings: order.plateMappings, plateRequirements: order.plateRequirements } : { filaments: order.filaments }),
       ...(order.projectData ? { projectData: order.projectData, catalogSelections: order.catalogSelections } : {}),
       release: order.release ?? "automatic",
       on_filament_mismatch: order.on_filament_mismatch ?? "wait",
@@ -140,7 +147,7 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}, cat
         file: record.source,
         filename: record.intent.filename,
         plate: item.plate,
-        filaments: record.intent.filaments,
+        filaments: record.intent.plateRequirements?.find(p => p.plate === item.plate)?.filaments ?? record.intent.filaments,
         release: record.intent.release,
         ...(record.intent.on_filament_mismatch ? { on_filament_mismatch: record.intent.on_filament_mismatch } : {}),
         ...(record.intent.printer_id ? { printer_id: record.intent.printer_id } : {}),

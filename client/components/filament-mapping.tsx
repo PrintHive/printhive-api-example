@@ -24,6 +24,8 @@ export function FilamentMapping({
   disabled,
   choose,
   setHint,
+  bulkTargets,
+  applyToTargets,
 }: {
   source: Source;
   plateNumber: number;
@@ -33,6 +35,8 @@ export function FilamentMapping({
   disabled: boolean;
   choose: (value: Material) => void;
   setHint: (value: Hint) => void;
+  bulkTargets?: number[];
+  applyToTargets?: () => void;
 }) {
   const [query, setQuery] = useState(source.material);
   const [finderOpen, setFinderOpen] = useState(false);
@@ -62,13 +66,7 @@ export function FilamentMapping({
       setResults(data.materials);
       setPage(data);
       setStatus(
-        (data.mode === "catalog-item-http"
-          ? "HTTP GET /v1/materials/{id}. Direct catalog ID lookup. "
-          : data.mode === "legacy-catalog"
-            ? "SDK search unavailable: using legacy catalog HTTP lookup. "
-            : data.matchMode === "broadened"
-              ? "Hive broadened this query. "
-              : "") +
+        (data.matchMode === "broadened" ? "Hive broadened this query. " : "") +
           (data.materials.length
             ? `${data.total} results · showing ${data.offset + 1}–${data.offset + data.materials.length}`
             : "No matching catalog filaments. Try a name, SKU, or ID."),
@@ -95,6 +93,9 @@ export function FilamentMapping({
   }, [selected, finderOpen]);
   const finderVisible = !selected || finderOpen;
   const finderId = `finder-${plateNumber}-${source.sourceSlot}`;
+  const targets = bulkTargets ?? [];
+  const bulk = Boolean(selected && applyToTargets && targets.length);
+  const bulkId = `bulk-${plateNumber}-${source.sourceSlot}`;
   const location = hint ?? { ams: "", slot: "" };
   return (
     <div
@@ -134,27 +135,51 @@ export function FilamentMapping({
           <p className="font-mono text-xs break-all text-muted-foreground">
             ID {selected.id}
           </p>
-          <Button
-            ref={changeButton}
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={disabled}
-            aria-expanded={finderVisible}
-            aria-controls={finderId}
-            onClick={() => setFinderOpen(true)}
-          >
-            Change requirement
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              ref={changeButton}
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={disabled}
+              aria-expanded={finderVisible}
+              aria-controls={finderId}
+              onClick={() => setFinderOpen(true)}
+            >
+              Change requirement
+            </Button>
+            {bulk && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={disabled}
+                aria-describedby={bulkId}
+                aria-label={`Apply to selected plates using source slot ${source.sourceSlot}`}
+                onClick={applyToTargets}
+              >
+                Apply to selected plates
+              </Button>
+            )}
+          </div>
+          {bulk && (
+            <p id={bulkId} className="text-xs text-muted-foreground">
+              Copies only this material to{" "}
+              {targets.length === 1
+                ? `plate ${targets[0]}`
+                : `plates ${targets.join(", ")}`}
+              . Existing material choices are replaced. Placement is not copied.
+            </p>
+          )}
         </div>
       )}
       {finderVisible && (
         <div id={finderId} className="space-y-4">
           <SdkCall call="client.filaments.search({ query, limit: 20, offset })">
             Hive searches catalog filaments by free text, such as black PETG or
-            bambu red. Select a catalog filamentId; the server resolves it to
-            the material and color accepted by create. SDK 0.3.2 uses the
-            labeled legacy HTTP lookup until the search release is installed.
+            bambu red. Select a catalog filament that can be used
+            for job creation. Other search results explain why they cannot be
+            selected.
           </SdkCall>
           <div className="space-y-2">
             <Label htmlFor={`search-${plateNumber}-${source.sourceSlot}`}>
