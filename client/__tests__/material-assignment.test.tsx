@@ -50,7 +50,7 @@ function fixture(manual = false, options: { project?: typeof project } = {}) {
         return Response.json({
           baseUrl: "http://127.0.0.1:9999",
           production: false,
-          maxUploadBytes: 16777216,
+          maxUploadBytes: 157286400,
           sdk: {
             version: "0.4.1",
             source: "installed-package",

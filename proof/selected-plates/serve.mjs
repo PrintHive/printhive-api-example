@@ -51,6 +51,7 @@ const upstream = createServer(async (req, res) => {
       if ((requirement.material !== undefined && requirement.material.toUpperCase() !== row.material_type.toUpperCase()) || (requirement.color !== undefined && requirement.color.toUpperCase() !== row.color.toUpperCase())) return reply({ error: 'filament_catalog_conflict' }, 422);
     }
     events.push({ createdPlate: Number(form.get('plate')), requirements, release: form.get('release') });
+    await new Promise(resolve => setTimeout(resolve, 1600));
     const requestId = randomUUID();
     const record = { plate: Number(form.get('plate')), printerId: form.get('printer_id'), requestId, status: 'preparing', externalId: null, createdAt: new Date().toISOString(), job: null, requiredActions: [], error: null };
     requests.set(requestId, { record, since: Date.now(), manual: form.get('release') === 'manual' });
@@ -60,11 +61,22 @@ const upstream = createServer(async (req, res) => {
   const item = requests.get(parts[3]);
   if (!item) return reply({ error: 'not_found' }, 404);
   if (req.method === 'POST' && parts[4] === 'cancel') { item.record.status = 'cancelled'; item.record.requiredActions = []; return reply({ cancelled: true, status: 'cancelled', code: 'cancelled' }, 202); }
+  if (req.method === 'POST' && parts[4] === 'approve-review') {
+    const chunks = []; for await (const chunk of req) chunks.push(chunk);
+    const review = JSON.parse(Buffer.concat(chunks).toString());
+    const reported = item.record.requiredActions[0]?.hold;
+    const { changes, sourceRelease, engineRelease } = reported ?? {};
+    if (JSON.stringify(review) !== JSON.stringify({ changes, sourceRelease, engineRelease })) return reply({ error: 'review_conflict' }, 409);
+    item.record.status = 'preparing'; item.reviewed = true; item.record.requiredActions = []; item.since = Date.now();
+    return reply({ approved: true }, 202);
+  }
   if (req.method === 'POST' && parts[4] === 'release') { item.record.status = 'preparing'; item.record.requiredActions = []; item.manual = false; item.since = Date.now(); return reply({ authorized: true }); }
   if (item.record.status === 'preparing' && Date.now() - item.since > 1500) {
     item.record.status = item.manual ? 'held' : 'created';
-    item.record.requiredActions = item.manual ? [{ code: 'manual_release_required' }] : [];
-    if (item.record.plate === 9) { item.record.status = 'failed'; item.record.error = { error: 'slicing_failed', message: 'Synthetic failure for progress demo' }; item.record.requiredActions = []; }
+    item.record.requiredActions = item.manual ? item.record.plate === 7 && !item.reviewed
+      ? [{ item: 0, plateNumber: 7, hold: { code: 'project_review_required', detail: 'Review engine upgrade', changes: [{ key: 'speed', sourceValue: '50', engineValue: '60', slots: [1] }], sourceRelease: 'old', engineRelease: 'new' } }]
+      : [{ code: 'manual_release_required' }, { code: 'preparation_lineage_unreadable' }] : [];
+    if (item.record.plate === 9) { item.record.status = 'failed'; item.record.error = { code: 'filaments_do_not_cover_plate', message: 'Synthetic failure for progress demo', missingSlots: [3] }; item.record.requiredActions = []; }
     if (!item.manual && item.record.status !== 'failed') item.record.job = { id: 42, status: 'QUEUED', model_file_id: null, printer_id: item.record.printerId || null, print_options: null };
   }
   reply(item.record);
@@ -79,6 +91,10 @@ const application = app.listeners('request')[0];
 app.removeAllListeners('request');
 app.on('request', async (req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1');
+  if (['/demo.js', '/shared.3mf'].includes(url.pathname)) {
+    const bytes = await readFile(new URL('.' + url.pathname, import.meta.url));
+    res.writeHead(200, { 'content-type': url.pathname.endsWith('.js') ? 'text/javascript' : 'application/octet-stream' }); return res.end(bytes);
+  }
   const file = url.pathname.match(/^\/proof\/(manual-desktop|automatic-desktop|manual-mobile)\.mp4$/);
   if (file && req.method === 'GET') {
     try { const bytes = await readFile(new URL(`./${file[1]}.mp4`, import.meta.url)); res.writeHead(200, { 'content-type': 'video/mp4', 'content-length': bytes.length }); return res.end(bytes); }

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { engineReviewFor } from "../../src/engine-review.mjs";
 import { z } from "zod";
 import { validateProjectData } from "../../src/project-data.mjs";
 import { mappedPlateInputs } from "../../src/mapped-plates.mjs";
 import { shouldPollJob } from "../../src/job-status.mjs";
 import { pruneSlots, sharedSourcePlates, selectedSourceGroups } from "./material-assignments";
 import {
+  LocalApiError,
   acceptedSchema,
   api,
   configSchema,
@@ -26,6 +28,8 @@ import {
   type Source,
 } from "./api";
 
+const sessionOrderKey = "printhive-active-order";
+const savedOrderSchema = z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/), plates: z.array(z.number().int().positive()) });
 type Active = { id: string; plates: number[]; options: RequestInit | null };
 export function useOrderWorkflow() {
   const [config, setConfig] = useState<Config | null>(null);
@@ -59,6 +63,13 @@ export function useOrderWorkflow() {
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
   const [submitted, setSubmitted] = useState(false);
+  const settled = Boolean(active && !busy && order?.plates.length && order.plates.every(p => ["created", "failed", "cancelled"].includes(p.status)));
+  useEffect(() => {
+    if (!active || settled) return;
+    const guard = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", guard);
+    return () => window.removeEventListener("beforeunload", guard);
+  }, [active, settled]);
   const [error, setError] = useState("");
   const [payload, setPayload] = useState<unknown>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
@@ -223,8 +234,8 @@ export function useOrderWorkflow() {
     try {
       if (!/\.3mf$/i.test(value.name) || !value.size)
         throw new Error("Choose a nonempty .3mf project");
-      if (value.size > 16 * 1024 * 1024 - 65536)
-        throw new Error("Choose a 3MF smaller than 16 MiB including form data");
+      if (value.size > 150 * 1024 * 1024)
+        throw new Error("Choose a 3MF no larger than 150 MiB");
       const body = new FormData();
       body.set("file", value);
       const data = await api("/project-data/inspect", extractionSchema, {
@@ -364,6 +375,8 @@ export function useOrderWorkflow() {
       if (!plate) throw new Error(`Confirm source usage for plate ${number}`);
       return plate;
     });
+    if (printer.trim() && !z.string().uuid().safeParse(printer.trim()).success)
+      throw new Error("Printer ID must be a UUID or empty for Smart Queue");
     const input: MappedInput = {
       id: `browser-${crypto.randomUUID()}`,
       plates: selectedPlates,
@@ -460,26 +473,40 @@ export function useOrderWorkflow() {
       )
         timer.current = setTimeout(() => {
           void refresh();
-        }, 1000);
+        }, value.plates.some(receipt => receipt.status === "created") ? 5000 : 2000);
     } catch (e) {
       if (
         !controller.signal.aborted &&
         mounted.current &&
         generation === pollGeneration.current
       ) {
-        setError(`${message(e)}. Status is unknown. Polling will retry.`);
+        if (!(e instanceof LocalApiError && e.status === 404 && current.options))
+          setError(`${message(e)}. Status is unknown. Polling will retry.`);
         timer.current = setTimeout(() => {
           void refresh();
         }, 3000);
       }
     }
   }, []);
+  useEffect(() => {
+    if (activeRef.current) { void refresh(); return; }
+    const stored = sessionStorage.getItem(sessionOrderKey);
+    if (!stored) return;
+    try {
+      const saved = savedOrderSchema.parse(JSON.parse(stored));
+      const resumed = { ...saved, options: null };
+      activeRef.current = resumed;
+      setActive(resumed);
+      setStatusPlate(saved.plates[0] ?? 1);
+      setSubmitted(true);
+      void refresh();
+    } catch { sessionStorage.removeItem(sessionOrderKey); }
+  }, [refresh]);
   async function submit(automaticConfirmed = false) {
     if (locked.current || !config) return;
     locked.current = true;
     setBusy(true);
     setError("");
-    clearTimeout(timer.current);
     try {
       let current = activeRef.current;
       if (!current) {
@@ -491,34 +518,38 @@ export function useOrderWorkflow() {
           return;
         }
         setAutomaticConfirmation(null);
+        const confirmedInput = { ...input, ...(release === "automatic" ? {
+          automaticConfirmed: true, confirmedDestination: input.printer_id ?? "smart-queue",
+        } : {}) };
         let options: RequestInit;
         if (file) {
           const body = new FormData();
-          body.set("order", JSON.stringify(input));
+          body.set("order", JSON.stringify(confirmedInput));
           body.set("file", file);
           options = { method: "POST", body };
-        } else options = json({ ...input, file: "cube.3mf" });
+        } else options = json({ ...confirmedInput, file: "cube.3mf" });
         current = { id: input.id, plates: input.plates, options };
         setStatusPlate(input.plates[0] ?? 1);
+        sessionStorage.setItem(sessionOrderKey, JSON.stringify({ id: current.id, plates: current.plates }));
         activeRef.current = current;
         setActive(current);
+        void refresh();
       }
-      if (!current.options) return;
-      await api("/orders", acceptedSchema, current.options);
+      await api(current.options ? "/orders" : `/orders/${encodeURIComponent(current.id)}/retry`, acceptedSchema, current.options ?? { method: "POST" });
       current.options = null;
       setSubmitted(true);
       await refresh();
     } catch (e) {
       if (activeRef.current) await refresh();
       setError(
-        `${message(e)}${activeRef.current ? ". Retry preserves this order ID. Reload to change the input." : ""}`,
+        `${message(e)}${activeRef.current ? ". Follow per-plate status here. Do not create another order while status is unknown." : ""}`,
       );
     } finally {
       locked.current = false;
       setBusy(false);
     }
   }
-  async function action(kind: "release" | "cancel", plate = statusPlate) {
+  async function action(kind: "release" | "cancel" | "approve-review", plate = statusPlate) {
     const current = activeRef.current;
     if (!current || locked.current) return;
     locked.current = true;
@@ -529,7 +560,7 @@ export function useOrderWorkflow() {
       await api(
         `/orders/${encodeURIComponent(current.id)}/${plate}/${kind}`,
         receiptSchemaForAction,
-        { method: "POST" },
+        kind === "approve-review" ? json(engineReviewFor(order?.plates.find(p => p.plate === plate)?.requiredActions ?? [])) : { method: "POST" },
       );
     } catch (e) {
       failure = `${message(e)}. Status refreshed; check before retrying this action.`;
@@ -574,7 +605,7 @@ export function useOrderWorkflow() {
       invalidate();
     },
     mappingMode,
-    setMappingMode,
+    setMappingMode: (value: "selected" | "plate") => { setMappingMode(value); invalidate(); },
     confirmSelectedUsage,
     printerName,
     bulkTargets,
@@ -600,6 +631,7 @@ export function useOrderWorkflow() {
     order,
     busy,
     submitted,
+    settled,
     error,
     payload,
     previewBusy,
@@ -620,7 +652,7 @@ export function useOrderWorkflow() {
       invalidate();
     },
     setPrinter: (value: string, name = "") => {
-      setPrinter(value);
+      setPrinter(value.trim());
       setPrinterName(name);
       invalidate();
     },
@@ -647,7 +679,20 @@ export function useOrderWorkflow() {
       }));
       invalidate();
     },
-    newOrder: () => window.location.reload(),
+    newOrder: () => {
+      if (!settled) return;
+      clearTimeout(timer.current);
+      pollGeneration.current++;
+      pollController.current?.abort();
+      sessionStorage.removeItem(sessionOrderKey);
+      activeRef.current = null;
+      setActive(null);
+      setOrder(null);
+      setSubmitted(false);
+      setError("");
+      setRelease("manual");
+      invalidate();
+    },
   };
 }
 const receiptSchemaForAction = z.unknown();

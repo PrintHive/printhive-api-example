@@ -33,13 +33,13 @@ For your production demo, run the same app with your organization key file:
 
 ```sh
 export PRINTHIVE_BASE_URL=https://api.printhiv3d.com
-export PRINTHIVE_API_KEY_FILE="$HOME/.config/printhive-rehearsal/farm.key"
+export PRINTHIVE_API_KEY_FILE=/path/to/your/organization.key
 npm run dev
 ```
 
 Open <http://127.0.0.1:5173> and check the production destination banner. Choosing automatic release, or releasing a manual hold, can start real prints. Keep the key file private.
 
-The backend binds to `127.0.0.1`. It checks Host, Origin, and a random session header on every API call. The browser obtains the session from `/session`, never the Hive key. The dev proxy permits the exact `http://127.0.0.1:5173` origin. Built-app requests use their own origin. Reload the page after restarting the backend.
+The backend binds to `127.0.0.1`. It checks Host, Origin, and a random session header on every API call. The browser obtains the session from `/session`, never the Hive key. The dev proxy permits the exact `http://127.0.0.1:5173` origin. Built-app requests use their own origin. The browser renews its session after a backend restart. The active order ID stays in this tab's session storage, so a reload resumes status without resubmitting.
 
 ## 2. Choose a project and plates
 
@@ -96,17 +96,17 @@ const request = await client.printJobs.create({
 
 Expect a request ID and a `preparing` state. Hive inspects the source, slices the selected plate, and processes the output. Preparation can fail or hold for review. An accepted upload is not a created job.
 
-The browser polls this backend's `GET /orders/{id}` once per second. The backend calls `client.printJobs.getCreateRequest(requestId)` for each plate. When preparation permits manual review, expect `held` and the required action `manual_release_required`.
+The browser starts polling this backend's `GET /orders/{id}` during submission, every two seconds. Once a job exists, it polls every five seconds and stops when all plates and jobs are terminal. The backend calls `client.printJobs.getCreateRequest(requestId)` for each plate. When preparation permits manual review, expect `held` and the required action `manual_release_required`.
 
 ## 5. Review the hold
 
 Read **Required actions**. In your local mock environment, click **Release** to authorize the manual hold, or **Cancel** to stop before job creation.
 
-The backend calls `client.printJobs.releaseCreateRequest(requestId)` or `client.printJobs.cancelCreateRequest(requestId)`. Release is offered only when every reported action is `manual_release_required`. Other holds retain their API codes and details. Release cannot approve unrelated preparation holds.
+The backend calls `client.printJobs.releaseCreateRequest(requestId)` or `client.printJobs.cancelCreateRequest(requestId)`. Release is offered when every reported action is `manual_release_required` or `preparation_lineage_unreadable`. Other holds retain their API codes and details. Release cannot approve unrelated preparation holds. For a complete engine-setting review, compare the reported source and engine values, then use **Approve reported engine settings**. The backend calls SDK 0.6.0's `client.printJobs.approveReview(requestId, review)` with exactly those values. Hive rejects stale approvals. Other preparation holds need review in the Hive app.
 
 ## 6. Follow the job
 
-**Selected plate requests** shows all plates together, with slicing/preparation, holds, queued jobs, cancellations, and failures. The summary counts each state. Choose a plate to review its details or control it. One failed upload or poll does not hide its siblings. A failed delivery remains available for retry with its saved key. After release, expect `created` and a job ID. The backend then reads the live job:
+**Selected plate requests** shows all plates together, with slicing/preparation, holds, queued jobs, cancellations, and failures. The summary counts each state. Choose a plate to review its details or control it. One failed upload or poll does not hide its siblings. Network failures, 429, and 5xx responses can be retried with the saved key. Other 4xx rejections are final and retain their API status, code, message, and reasons. Click **New order** once all creation requests settle. After release, expect `created` and a job ID. The backend then reads the live job:
 
 ```ts
 const receipt = await client.printJobs.getCreateRequest(request.requestId);
@@ -119,7 +119,20 @@ The UI keeps the creation receipt separate from live job status. A job can wait 
 
 A created job does not prove a physical print completed. Production dispatch and slicing still depend on Hive inspection, readiness, and loaded material.
 
-The sample uses the published multipart API. Source-version creation and organization-wide request-history recovery from Hive's open Start Print PRs are follow-ups. This app keeps its existing local order store and same-order retries. It does not pretend that those unmerged endpoints are available.
+The sample uses the published multipart API and its local order store. Hive now also accepts JSON creation with `source_version_id` at `POST /v1/print-jobs/create`, following PR #5185. This sample does not implement that path. Organization-wide request-history recovery remains a follow-up.
+
+## If something goes wrong
+
+Keep the active order open. A reload resumes status in the same tab. **Retry same order** uses the saved server record and keys, including after a backend restart. Avoid creating another order for the same plates while status is unknown. Files up to 150 MiB are accepted; uploads stream to temporary disk, one at a time, with a ten-minute timeout.
+
+To control a request from a terminal, find its `requestId` in `data/<order>.json`, then run one of these commands with the same server environment:
+
+```sh
+npm run send-print -- release <requestId>
+npm run send-print -- cancel <requestId>
+```
+
+Release can start real prints. Once a job exists, cancel it in the Hive app.
 
 For other tasks, use the [CLI and HTTP guide](docs/send-orders.md), [catalog mapping guide](docs/map-filaments.md), [catalog sync guide](docs/sync-catalog.md), or [SDK reference](docs/sdk-upgrade.md). To check your changes, run `npm run verify`.
 

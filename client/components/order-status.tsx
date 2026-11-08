@@ -1,3 +1,4 @@
+import { engineReviewFor } from "../../src/engine-review.mjs";
 import {
   Clock3,
   Printer,
@@ -27,6 +28,7 @@ export function OrderStatus({ flow }: { flow: OrderWorkflow }) {
   const receipt =
     flow.order?.plates.find((p) => p.plate === flow.statusPlate) ??
     flow.order?.plates[0];
+  const review = engineReviewFor(receipt?.requiredActions ?? []);
   const read = receipt?.jobRead;
   const job = read?.kind === "available" ? read.job : null;
   const reasons = job?.filament_waiting_reasons ?? [];
@@ -36,10 +38,9 @@ export function OrderStatus({ flow }: { flow: OrderWorkflow }) {
     : false;
   const releasable =
     receipt?.status === "held" &&
-    receipt.requiredActions.length > 0 &&
     receipt.requiredActions.every((value) => {
       const parsed = actionSchema.safeParse(value);
-      return parsed.success && parsed.data.code === "manual_release_required";
+      return parsed.success && ["manual_release_required", "preparation_lineage_unreadable"].includes(parsed.data.code ?? "");
     });
   return (
     <Card className="shadow-none h-fit lg:sticky lg:top-6">
@@ -58,12 +59,12 @@ export function OrderStatus({ flow }: { flow: OrderWorkflow }) {
       </CardHeader>
       <CardContent className="pt-6 space-y-5">
         <SdkCall call="client.printJobs.getCreateRequest(requestId)">
-          Polls preparation once per second. A held request needs review; it is
+          Polls preparation every two seconds and jobs every five seconds. A held request needs review; it is
           not a job.
         </SdkCall>
         <SdkCall call="client.printJobs.releaseCreateRequest(requestId) or cancelCreateRequest(requestId)">
           This UI offers Release for
-          manual holds and Cancel before creation. The backend forwards the
+          holds permitted by Hive and Cancel before creation. The backend forwards the
           action. Hive decides whether to accept it.
         </SdkCall>
         <SdkCall call="client.printJobs.get(jobId)">
@@ -283,6 +284,15 @@ export function OrderStatus({ flow }: { flow: OrderWorkflow }) {
                 )}
               </div>
             )}
+            {receipt?.status === "held" && !releasable && <p className="text-sm text-muted-foreground">
+              This hold requires preparation review. Release alone cannot approve engine-setting changes.
+              {review ? " Review the exact source and engine values below before approving. Approval re-slices the plate." : " Review this request in the Hive app before continuing."}
+            </p>}
+            {receipt?.status === "held" && review && <div className="space-y-2">
+              <pre className="code-panel" aria-label="Engine settings to approve">{JSON.stringify(review, null, 2)}</pre>
+              <Button type="button" disabled={flow.busy} onClick={() => void flow.action("approve-review")}>Approve reported engine settings</Button>
+            </div>}
+            {receipt?.status === "created" && <p className="text-sm text-muted-foreground">Once a job exists, cancel it in the Hive app.</p>}
             <div className="flex flex-wrap gap-2 border-t pt-4">
               {releasable && (
                 <Button

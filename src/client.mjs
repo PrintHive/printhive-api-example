@@ -20,8 +20,9 @@ export function clientFromEnv() {
   ) {
     throw new Error("Use HTTPS or a loopback development API");
   }
-  const hive = new PrintHive({ apiKey, baseUrl });
-  async function control(requestId, action) {
+  const hive = new PrintHive({ apiKey, baseUrl, timeoutMs: 10 * 60 * 1000 });
+  async function control(requestId, action, review) {
+    if (action === "approve-review") return hive.printJobs.approveReview(requestId, review);
     if (action === "release") return hive.printJobs.releaseCreateRequest(requestId);
     if (action === "cancel") return hive.printJobs.cancelCreateRequest(requestId);
     throw new Error("Invalid action");

@@ -72,10 +72,7 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
         <form
           id="order-form"
           className="space-y-6"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!flow.submitted) void flow.submit();
-          }}
+          onSubmit={(e) => e.preventDefault()}
         >
           <SdkCall call="Local upload and plate inspection">
             Plate inspection makes no SDK call. Hive receives the file on
@@ -102,8 +99,7 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
                 />
                 <p className="text-xs text-muted-foreground">
                   Choose a project to extract its plate numbers and palette.
-                  Leave empty for the bundled cube. Maximum 16 MiB including
-                  form data.
+                  Leave empty for the bundled cube. Maximum 150 MiB per file.
                 </p>
               </div>
             </div>
@@ -139,7 +135,7 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
             {flow.release === "automatic" && (
               <p role="alert" className="rounded-md border border-destructive/30 p-3 text-sm">
                 Automatic release will start real prints on the farm.
-                Destination: {flow.printer ? flow.printerName || flow.printer : "Smart Queue"}.
+                Destination: {flow.printer.trim() ? flow.printerName || flow.printer.trim() : "Smart Queue"}.
                 You must confirm before submitting.
               </p>
             )}
@@ -383,7 +379,7 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
                 <h3 className="font-semibold">Choose the destination</h3>
               </div>
               <div className="rounded-md border bg-muted/30 p-3 space-y-2">
-                <p className="text-sm font-medium">Destination: {flow.printer ? flow.printerName || flow.printer : "Smart Queue"}</p>
+                <p className="text-sm font-medium">Destination: {flow.printer.trim() ? flow.printerName || flow.printer.trim() : "Smart Queue"}</p>
                 <p className="text-xs text-muted-foreground">Smart Queue slices each selected plate and distributes jobs across the farm as printers become ready.</p>
                 <Button type="button" variant="outline" aria-pressed={!flow.printer}
                   disabled={disabled} onClick={() => flow.setPrinter("")}>Use Smart Queue</Button>
@@ -473,13 +469,13 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
             </pre>
             <Button
               id="submit"
-              type={flow.submitted ? "button" : "submit"}
+              type="button"
               variant={flow.submitted ? "outline" : "default"}
               className="w-full"
               disabled={
-                flow.busy || !flow.config || (!flow.active && !flow.complete)
+                flow.busy || !flow.config || (!flow.active && !flow.complete) || Boolean(flow.active && !flow.settled && !flow.order?.plates.some(p => p.status === "pending_submission") && !flow.active.options)
               }
-              onClick={flow.submitted ? flow.newOrder : undefined}
+              onClick={() => flow.settled ? flow.newOrder() : void flow.submit()}
             >
               {flow.busy ? (
                 <LoaderCircle className="size-4 animate-spin" />
@@ -490,8 +486,8 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
               )}
               {flow.busy
                 ? "Submitting order…"
-                : flow.submitted
-                  ? "Start another order"
+                : flow.settled
+                  ? "New order"
                   : flow.active
                     ? "Retry same order"
                     : "Submit order"}

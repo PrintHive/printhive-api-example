@@ -141,9 +141,12 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}) {
       };
       await save(record); // Durable keys BEFORE any outbound call.
     }
+    return submitStored(record);
+  }
+  async function submitStored(record) {
     let submissionError;
     for (const item of record.plates) {
-      if (item.requestId) continue;
+      if (item.requestId || item.error?.retryable === false) continue;
       try {
         const receipt = await hive.printJobs.create({
           file: record.source,
@@ -160,7 +163,16 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}) {
         onReceipt(receipt);
         await save(record);
       } catch (error) {
-        item.error = { code: typeof error.code === "string" ? error.code : "submission_unreachable", message: "Not confirmed by Hive. Retry the same order with its saved key." };
+        const upstreamStatus = Number.isInteger(error.status) ? error.status : null;
+        const retryable = upstreamStatus === null || upstreamStatus === 429 || upstreamStatus >= 500;
+        item.error = {
+          ...(error.body && typeof error.body === "object" ? error.body : {}),
+          code: typeof error.code === "string" ? error.code : "submission_unreachable",
+          upstreamStatus,
+          retryable,
+          message: error.body?.message ?? error.message ?? "Submission failed",
+          ...(retryable ? { retryAdvice: "Not confirmed by Hive. Retry the same order with its saved key." } : {}),
+        };
         await save(record);
         submissionError ??= error;
       }
@@ -174,6 +186,12 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}) {
       queue = result.catch(() => {});
       return result;
     },
+    load,
+    retry(id) {
+      const result = queue.then(async () => submitStored(await load(id)));
+      queue = result.catch(() => {});
+      return result;
+    },
     async status(id) {
       const record = await load(id);
       return {
@@ -181,8 +199,8 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}) {
         plates: await Promise.all(
           record.plates.map(async (item) => {
             try {
-              const receipt = item.requestId ? await hive.printJobs.getCreateRequest(item.requestId) : { status: "pending_submission", error: item.error };
-              return { plate: item.plate, ...receipt, jobRead: await readCreatedJob(hive, receipt) };
+              const receipt = item.requestId ? await hive.printJobs.getCreateRequest(item.requestId) : { status: item.error?.retryable === false ? "failed" : "pending_submission", error: item.error };
+              return { ...receipt, plate: item.plate, jobRead: await readCreatedJob(hive, receipt) };
             } catch (error) {
               return { plate: item.plate, requestId: item.requestId, status: "status_unavailable", error: {
                 code: typeof error.code === "string" ? error.code : "poll_unreachable",

@@ -23,6 +23,12 @@ try {
     await page.evaluate(script);
     const result = await page.evaluate(options => window.runSelectedDemo(options), { archive, automatic, rehearse });
     if (errors.length) throw new Error(errors.join('\n'));
+    if (!automatic) {
+      await page.reload();
+      await page.evaluate(script);
+      const recovery = await page.evaluate(options => window.runRecoveryDemo(options), { rehearse });
+      console.log(JSON.stringify({ name, recovery }));
+    }
     console.log(JSON.stringify({ name, result, errors }));
     await context.close();
     if (!rehearse) await page.video().saveAs(resolve(`data/selected-plates/${name}.webm`));

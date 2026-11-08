@@ -7,7 +7,7 @@ import { normalizeColor } from './project-data.mjs';
 const MAX_ENTRIES = 1000;
 const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024;
 const MAX_METADATA_BYTES = 16 * 1024 * 1024;
-const MAX_UPLOAD_BYTES = 16 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 150 * 1024 * 1024;
 const MAX_PREVIEW_BYTES = 512 * 1024;
 const MAX_PREVIEW_TOTAL_BYTES = 8 * 1024 * 1024;
 const previewPath = /^metadata\/plate_[1-9]\d*\.png$/;
@@ -238,7 +238,7 @@ function detectedPlateUsage(plate, metadata, palette, sliceInfo) {
   return json.reason === 'empty_usage_metadata' ? json : slice;
 }
 export async function inspectProject(bytes, filename) {
-  if (!Buffer.isBuffer(bytes) || !bytes.length || bytes.length > MAX_UPLOAD_BYTES) throw invalid('Choose a nonempty 3MF within the 16 MiB upload limit');
+  if (!Buffer.isBuffer(bytes) || !bytes.length || bytes.length > MAX_UPLOAD_BYTES) throw invalid('Choose a nonempty 3MF within the 150 MiB upload limit');
   const metadata = await readMetadata(bytes);
   const palette = paletteFrom(metadata.get('metadata/project_settings.config'));
   const sliceInfo = sliceInfoUsage(metadata.get('metadata/slice_info.config'), palette);

@@ -37,7 +37,11 @@ curl --fail-with-body http://127.0.0.1:3081/orders \
 curl --fail-with-body http://127.0.0.1:3081/orders/sample-1001 -H "X-PrintHive-Session: $SESSION"
 ```
 
-For browser uploads, send multipart `POST /orders` with an `order` JSON field and a `file` field. Keep the whole request below 16 MiB. JSON requests have a 64 KiB limit. Use `POST /orders/{id}/{plate}/release` or `/cancel` to control a request before job creation.
+For browser uploads, send multipart `POST /orders` with an `order` JSON field and a `file` field. The file limit is 150 MiB, plus at most 64 KiB for multipart metadata. Uploads stream to temporary disk, one at a time, and allow ten minutes. JSON requests have a 64 KiB limit. Use `POST /orders/{id}/{plate}/release` or `/cancel` to control a request before job creation. These actions read the request ID from the local order record. Once a job exists, cancel it in the Hive app.
+
+Automatic HTTP orders require `automaticConfirmed: true` and `confirmedDestination` equal to the exact `printer_id`, or `"smart-queue"` when no printer is specified. Manual orders need no automatic confirmation.
+
+The browser remembers the active order in session storage and polls while plates upload. After a reload or backend restart, it resumes status and renews the local session automatically. Use `POST /orders/{id}/retry` to retry pending submissions from the saved source and keys without another upload. Final 4xx rejections, except 429, are not retried. The browser offers **New order** once all creation requests settle.
 
 ## Prepare a hosted integration
 

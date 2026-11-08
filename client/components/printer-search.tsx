@@ -101,7 +101,7 @@ export function PrinterSearch({
             variant="outline"
             size="sm"
             disabled={disabled}
-            onClick={() => choose(printer.id, printer.name)}
+            onClick={() => choose(printer.id, `${printer.name} · ${printer.model ?? "Unknown model"} · …${printer.id.slice(-8)}`)}
           >
             Use {printer.name}
           </Button>

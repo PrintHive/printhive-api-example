@@ -38,7 +38,7 @@ test('extracts exact sparse plate IDs and palette indices without treating palet
 test('malformed and unsupported archives fail explicitly instead of inventing plate 1', async () => {
   await assert.rejects(inspectProject(Buffer.from('not a ZIP'), 'bad.3mf'), /valid ZIP/);
   await assert.rejects(inspectProject(Buffer.alloc(0), 'empty.3mf'), /nonempty/);
-  await assert.rejects(inspectProject(Buffer.alloc(16 * 1024 * 1024 + 1), 'large.3mf'), /16 MiB/);
+  await assert.rejects(inspectProject(Buffer.alloc(150 * 1024 * 1024 + 1), 'large.3mf'), /150 MiB/);
   for (const name of ['unsafe-path', 'dtd', 'bad-xml', 'bad-json', 'missing-metadata', 'oversized-metadata', 'duplicate-plates', 'no-plates', 'too-many-entries', 'symlink']) {
     await assert.rejects(inspectProject(await readFile(`test/fixtures/project-inspection/${name}.3mf`), `${name}.3mf`), undefined, name);
   }
@@ -55,7 +55,7 @@ test('extraction endpoint rejects missing files, bad archives and oversize HTTP 
   const failed = await localFetch(url, { method: 'POST', body: invalid });
   assert.equal(failed.status, 422);
   assert.match((await failed.json()).error, /valid ZIP/);
-  const huge = new FormData(); huge.set('file', new Blob([Buffer.alloc(16 * 1024 * 1024)]), 'large.3mf');
+  const huge = new FormData(); huge.set('file', new Blob([Buffer.alloc(150 * 1024 * 1024 + 1)]), 'large.3mf');
   assert.equal((await localFetch(url, { method: 'POST', body: huge })).status, 413);
   assert.equal(creates, 0);
 });

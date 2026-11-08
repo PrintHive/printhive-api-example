@@ -3,13 +3,18 @@ import type { Receipt } from "./api";
 
 const detailSchema = z.object({
   code: z.string().optional(), error: z.string().optional(), message: z.string().optional(),
-  reason: z.string().optional(), body: z.object({ error: z.string().optional(), message: z.string().optional() }).optional(),
+  reason: z.string().optional(), missingSlots: z.array(z.number()).optional(), reasons: z.unknown().optional(),
+  retryAdvice: z.string().optional(), upstreamStatus: z.number().nullable().optional(), body: z.object({ error: z.string().optional(), message: z.string().optional() }).optional(),
 });
 function reasonOf(value: unknown) {
   const parsed = detailSchema.safeParse(value);
   if (!parsed.success) return typeof value === "string" ? value : JSON.stringify(value);
   const detail = parsed.data;
-  return [detail.code ?? detail.error ?? detail.body?.error, detail.message ?? detail.reason ?? detail.body?.message].filter(Boolean).join(": ") || JSON.stringify(value);
+  return [detail.code ?? detail.error ?? detail.body?.error, detail.message ?? detail.reason ?? detail.body?.message,
+    detail.missingSlots?.length ? `Missing source slots: ${detail.missingSlots.join(", ")}` : null,
+    detail.reasons ? JSON.stringify(detail.reasons) : null,
+    detail.upstreamStatus ? `HTTP ${detail.upstreamStatus}` : null, detail.retryAdvice,
+  ].filter(Boolean).join(": ") || JSON.stringify(value);
 }
 
 // Adapted from Start Print's ledger: a creation receipt and live job remain separate.
