@@ -1,6 +1,6 @@
 # Local project metadata reference
 
-`POST /project-data/inspect` accepts one multipart `.3mf` file. The entire HTTP request has a 16 MiB limit. Inspection creates no Hive request, executes no embedded G-code, and does not expand mesh geometry.
+`POST /project-data/inspect` accepts one multipart `.3mf` file. The file limit is 150 MiB, with up to 64 KiB of multipart metadata. Files stream to temporary disk. Inspection creates no Hive request, executes no embedded G-code, and does not expand mesh geometry.
 
 The extractor reads Bambu project metadata in `Metadata/project_settings.config` and `Metadata/model_settings.config`. Optional `Metadata/plate_N.json` and `Metadata/slice_info.config` supply saved usage candidates. Plate numbers come from the model settings, not a guessed plate 1.
 

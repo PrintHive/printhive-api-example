@@ -63,7 +63,7 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
           <div>
             <CardTitle className="text-xl">Prepare your order</CardTitle>
             <CardDescription>
-              One project, selected plates, independent filament requirements.
+              Choose plates, map their source filaments, then choose where to print.
             </CardDescription>
           </div>
         </div>
@@ -72,10 +72,7 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
         <form
           id="order-form"
           className="space-y-6"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!flow.submitted) void flow.submit();
-          }}
+          onSubmit={(e) => e.preventDefault()}
         >
           <SdkCall call="Local upload and plate inspection">
             Plate inspection makes no SDK call. Hive receives the file on
@@ -102,8 +99,7 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
                 />
                 <p className="text-xs text-muted-foreground">
                   Choose a project to extract its plate numbers and palette.
-                  Leave empty for the bundled cube. Maximum 16 MiB including
-                  form data.
+                  Leave empty for the bundled cube. Maximum 150 MiB per file.
                 </p>
               </div>
             </div>
@@ -131,11 +127,18 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
                     Manual · review first
                   </NativeSelectOption>
                   <NativeSelectOption value="automatic">
-                    Auto · queue when ready
+                    Automatic · start real prints when ready
                   </NativeSelectOption>
                 </NativeSelect>
               </div>
             </div>
+            {flow.release === "automatic" && (
+              <p role="alert" className="rounded-md border border-destructive/30 p-3 text-sm">
+                Automatic release will start real prints on the farm.
+                Destination: {flow.printer.trim() ? flow.printerName || flow.printer.trim() : "Smart Queue"}.
+                You must confirm before submitting.
+              </p>
+            )}
             <p
               id="project-summary"
               className="text-sm text-muted-foreground"
@@ -196,6 +199,18 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
                 </Button>
               </div>
             </details>
+            {flow.extracted && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Saved plate usage can be stale. Review the selected plates' source slots before sending.
+                  If usage is unresolved, configure that plate below. Painted and support usage needs known plate data when it is absent from saved slice metadata.
+                </p>
+                <Button type="button" variant="outline" onClick={flow.confirmSelectedUsage}
+                  disabled={disabled || !flow.selectedPlates.length}>
+                  Confirm saved usage for selected plates
+                </Button>
+              </div>
+            )}
             {flow.extracted && (
               <fieldset
                 id="source-usage"
@@ -276,7 +291,7 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
               <div className="flex items-center gap-3">
                 <span className="step-index">02</span>
                 <h3 className="font-semibold">
-                  Map plate {flow.plateNumber} filament requirements
+                  Map filaments for selected plates
                 </h3>
               </div>
               <p className="text-xs leading-relaxed text-muted-foreground">
@@ -284,7 +299,33 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
                 type and color, not exact SKU identity. Smart Queue resolves
                 physical placement.
               </p>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Mapping view">
+                <Button type="button" variant={flow.mappingMode === "selected" ? "secondary" : "outline"}
+                  aria-pressed={flow.mappingMode === "selected"} onClick={() => flow.setMappingMode("selected")}>
+                  Selected plates together
+                </Button>
+                <Button type="button" variant={flow.mappingMode === "plate" ? "secondary" : "outline"}
+                  aria-pressed={flow.mappingMode === "plate"} onClick={() => flow.setMappingMode("plate")}>
+                  Per-plate overrides
+                </Button>
+              </div>
               <div id="filaments" className="space-y-4">
+                {flow.mappingMode === "selected" && flow.sourceGroups.map(({ source, plates }) => (
+                  <div key={`${source.sourceSlot}-${source.material}-${source.color}`} className="space-y-2" data-selected-source={source.sourceSlot}>
+                    <p className="text-xs text-muted-foreground">Source slot {source.sourceSlot} · used by plates {plates.join(", ")}</p>
+                    <FilamentMapping source={source} plateNumber={plates[0] ?? 1}
+                      selected={flow.groupSelection(source, plates)} hint={flow.groupHint(source, plates)}
+                      printer={flow.printer} disabled={disabled}
+                      choose={value => flow.chooseGroup(source, value)}
+                      setHint={value => flow.setGroupHint(source, plates, value)} />
+                    {!flow.groupSelection(source, plates) && <p className="text-xs text-muted-foreground">
+                      Choose once for these selected plates. Use per-plate overrides to keep different choices.
+                    </p>}
+                  </div>
+                ))}
+                {flow.mappingMode === "selected" && !flow.sourceGroups.length && (
+                  <p className="text-sm text-muted-foreground">Select plates with known source usage to map their filaments.</p>
+                )}
                 {flow.extracted &&
                   !flow.confirmed[flow.plateNumber] &&
                   flow.currentSources.length > 0 && (
@@ -298,7 +339,7 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
                       before submitting.
                     </p>
                   )}
-                {flow.currentSources.map((source) => (
+                {flow.mappingMode === "plate" && flow.currentSources.map((source) => (
                   <FilamentMapping
                     key={`${flow.project?.sha256}-${flow.plateNumber}-${source.sourceSlot}`}
                     source={source}
@@ -315,7 +356,7 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
                     }
                   />
                 ))}
-                {!flow.currentSources.length && (
+                {flow.mappingMode === "plate" && !flow.currentSources.length && (
                   <p className="rounded-md border border-dashed p-5 text-center text-sm text-muted-foreground">
                     Select the source filaments above to assign requirements.
                     Confirm usage before submitting.
@@ -336,6 +377,12 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
               <div className="flex items-center gap-3">
                 <span className="step-index">03</span>
                 <h3 className="font-semibold">Choose the destination</h3>
+              </div>
+              <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+                <p className="text-sm font-medium">Destination: {flow.printer.trim() ? flow.printerName || flow.printer.trim() : "Smart Queue"}</p>
+                <p className="text-xs text-muted-foreground">Smart Queue slices each selected plate and distributes jobs across the farm as printers become ready.</p>
+                <Button type="button" variant="outline" aria-pressed={!flow.printer}
+                  disabled={disabled} onClick={() => flow.setPrinter("")}>Use Smart Queue</Button>
               </div>
               <PrinterSearch disabled={disabled} choose={flow.setPrinter} />
               <div className="space-y-2">
@@ -380,6 +427,17 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
             and color requirements. The server saves the key before submission
             so an unchanged retry keeps the same request.
           </SdkCall>
+          {flow.automaticConfirmation && (
+            <div role="alertdialog" aria-label="Confirm automatic printing" className="rounded-md border border-destructive/40 bg-destructive/5 p-4 space-y-3">
+              <h3 className="font-semibold">Start real prints on the farm?</h3>
+              <p className="text-sm">Destination: {flow.automaticConfirmation}.</p>
+              <p className="text-sm">Automatic release starts real prints on the farm when these plates are ready, without another review.</p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" disabled={flow.busy} onClick={() => void flow.confirmAutomatic()}>Confirm automatic printing</Button>
+                <Button type="button" variant="outline" onClick={flow.cancelAutomatic}>Go back</Button>
+              </div>
+            </div>
+          )}
           <div className="space-y-3 border-t pt-5">
             <Button
               id="preview"
@@ -411,13 +469,13 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
             </pre>
             <Button
               id="submit"
-              type={flow.submitted ? "button" : "submit"}
+              type="button"
               variant={flow.submitted ? "outline" : "default"}
               className="w-full"
               disabled={
-                flow.busy || !flow.config || (!flow.active && !flow.complete)
+                flow.busy || !flow.config || (!flow.active && !flow.complete) || Boolean(flow.active && !flow.settled && !flow.order?.plates.some(p => p.status === "pending_submission") && !flow.active.options)
               }
-              onClick={flow.submitted ? flow.newOrder : undefined}
+              onClick={() => flow.settled ? flow.newOrder() : void flow.submit()}
             >
               {flow.busy ? (
                 <LoaderCircle className="size-4 animate-spin" />
@@ -428,8 +486,8 @@ export function ProjectOrder({ flow }: { flow: OrderWorkflow }) {
               )}
               {flow.busy
                 ? "Submitting order…"
-                : flow.submitted
-                  ? "Start another order"
+                : flow.settled
+                  ? "New order"
                   : flow.active
                     ? "Retry same order"
                     : "Submit order"}

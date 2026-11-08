@@ -45,11 +45,12 @@ function fixture(manual = false, options: { project?: typeof project } = {}) {
     "fetch",
     vi.fn(async (path: RequestInfo | URL, init?: RequestInit) => {
       const url = String(path);
+      if (url === "/session") return Response.json({ token: "test-session" });
       if (url === "/config")
         return Response.json({
           baseUrl: "http://127.0.0.1:9999",
           production: false,
-          maxUploadBytes: 16777216,
+          maxUploadBytes: 157286400,
           sdk: {
             version: "0.4.1",
             source: "installed-package",
@@ -99,6 +100,7 @@ function fixture(manual = false, options: { project?: typeof project } = {}) {
 it("reconfirming unchanged source usage preserves the plate material assignment", async () => {
   fixture();
   render(<App />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Per-plate overrides" }));
   const user = userEvent.setup();
   await user.upload(
     screen.getByLabelText("Project 3MF"),
@@ -119,6 +121,7 @@ it("reconfirming unchanged source usage preserves the plate material assignment"
 it("allows material assignment before usage confirmation without bypassing confirmation", async () => {
   fixture();
   render(<App />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Per-plate overrides" }));
   const user = userEvent.setup();
   await user.upload(
     screen.getByLabelText("Project 3MF"),
@@ -136,6 +139,7 @@ it("allows material assignment before usage confirmation without bypassing confi
 it("shares a source assignment across plates and keeps a later individual override", async () => {
   const f = fixture(true);
   render(<App />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Per-plate overrides" }));
   const user = userEvent.setup();
   await screen.findByRole("button", { name: "Configure plate 2" });
   await user.click(screen.getByRole("checkbox", { name: "Include plate 7" }));
@@ -175,6 +179,7 @@ it("shares a source assignment across plates and keeps a later individual overri
 it("keeps bulk assignments through late confirmation and clears them for another project", async () => {
   fixture();
   render(<App />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Per-plate overrides" }));
   const user = userEvent.setup();
   await user.upload(
     screen.getByLabelText("Project 3MF"),
@@ -224,6 +229,7 @@ it("does not share a reused source slot when original material attributes differ
     },
   });
   render(<App />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Per-plate overrides" }));
   const user = userEvent.setup();
   await screen.findByRole("button", { name: "Configure plate 2" });
   await user.click(screen.getByRole("checkbox", { name: "Include plate 7" }));
@@ -242,6 +248,7 @@ it("does not share a reused source slot when original material attributes differ
 it("copies material choices without copying named-printer placement hints", async () => {
   const f = fixture(true);
   render(<App />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Per-plate overrides" }));
   const user = userEvent.setup();
   await screen.findByRole("button", { name: "Configure plate 2" });
   await user.click(screen.getByRole("checkbox", { name: "Include plate 7" }));

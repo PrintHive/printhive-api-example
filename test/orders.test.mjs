@@ -44,6 +44,7 @@ test("one durable key per plate; no printer required; concurrent retries do not 
   );
   assert.equal(new Set(calls.map((c) => c.idempotencyKey)).size, 2);
   assert.equal("printer_id" in calls[0], false);
+  assert.equal(calls[0].release, "manual");
   assert.deepEqual(
     (await s.orders.status("test")).plates.map((p) => p.status),
     ["preparing", "preparing"],
@@ -68,7 +69,9 @@ test("lost response survives restart with same key and original bytes", async (t
     s.dir,
   );
   await restarted.submit(s.order);
-  assert.equal(calls[0].idempotencyKey, calls[1].idempotencyKey);
+  assert.deepEqual(calls.map(call => call.plate), [1, 2, 1, 2]);
+  assert.equal(calls[0].idempotencyKey, calls[2].idempotencyKey);
+  assert.equal(calls[1].idempotencyKey, calls[3].idempotencyKey);
   await assert.rejects(
     restarted.submit({ ...s.order, printer_id: "changed" }),
     /conflicts/,

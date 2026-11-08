@@ -28,7 +28,7 @@ const project = {
 const config = {
   baseUrl: "http://127.0.0.1:9999",
   production: false,
-  maxUploadBytes: 16 * 1024 * 1024,
+  maxUploadBytes: 150 * 1024 * 1024,
   sdk: {
     version: "0.4.1",
     source: "local-workspace",
@@ -42,6 +42,7 @@ function fixture(
 ) {
   const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input);
+    if (path === "/session") return Response.json({ token: "test-session" });
     const response = extra?.(path, init);
     if (response) return response;
     if (path === "/config") return Response.json(config);
@@ -63,6 +64,7 @@ describe("React order workflow", () => {
   it("loads the destination and blocks submission until a requirement is selected", async () => {
     const calls = fixture();
     render(<App />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Per-plate overrides" }));
     expect(await screen.findByText("Use Fixture PETG")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Submit order" })).toBeDisabled();
     const user = userEvent.setup();
@@ -103,6 +105,7 @@ describe("React order workflow", () => {
       });
     });
     render(<App />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Per-plate overrides" }));
     const user = userEvent.setup();
     await user.click(
       await screen.findByRole("button", { name: "Use Fixture PETG" }),
@@ -167,8 +170,9 @@ describe("React order workflow", () => {
           id,
           plates: [
             {
-              requestId: "request-1",
-              status: "held",
+              plate: 1,
+              requestId: submitted.length > 1 ? "request-1" : null,
+              status: submitted.length > 1 ? "held" : "pending_submission",
               job: null,
               requiredActions: [{ code: "manual_release_required" }],
               error: null,
@@ -177,14 +181,13 @@ describe("React order workflow", () => {
         });
     });
     render(<App />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Per-plate overrides" }));
     const user = userEvent.setup();
     await user.click(
       await screen.findByRole("button", { name: "Use Fixture PETG" }),
     );
     await user.click(screen.getByRole("button", { name: "Submit order" }));
-    expect(
-      await screen.findByRole("button", { name: "Retry same order" }),
-    ).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Retry same order" })).toBeEnabled());
     expect(screen.getByLabelText("Printer ID (optional)")).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Retry same order" }));
     expect(
@@ -213,6 +216,7 @@ it("searches printers by free text and uses the selected UUID", async () => {
     });
   });
   render(<App />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Per-plate overrides" }));
   const user = userEvent.setup();
   await user.type(
     screen.getByLabelText("Find a printer by name or model"),
@@ -253,6 +257,7 @@ it("shows SDK search results but disables filaments not accepted by create", asy
     });
   });
   render(<App />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Per-plate overrides" }));
   expect(
     await screen.findByRole("button", { name: "Use Fixture PETG" }),
   ).toBeEnabled();
@@ -284,6 +289,7 @@ it("selects an eligible global filament and previews its catalog ID", async () =
   });
   const user = userEvent.setup();
   render(<App />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Per-plate overrides" }));
   const choose = await screen.findByRole("button", { name: "Use Generic PETG-CF" });
   expect(choose).toBeEnabled();
   await user.click(choose);
@@ -388,6 +394,7 @@ it("selects preview cards, preserves per-plate mappings, and controls each submi
       });
   });
   render(<App />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Per-plate overrides" }));
   const user = userEvent.setup();
   await user.upload(
     screen.getByLabelText("Project 3MF"),
@@ -436,6 +443,7 @@ it("selects preview cards, preserves per-plate mappings, and controls each submi
   await screen.findByRole("button", { name: "Plate 2 · created" });
   expect(actions).toContain(`/orders/${id}/2/release`);
   phases[7] = "preparing";
+  await user.click(screen.getByRole("button", { name: "Refresh status" }));
   await waitFor(
     () =>
       expect(

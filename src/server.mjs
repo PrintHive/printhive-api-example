@@ -1,21 +1,24 @@
+import { engineReviewSchema } from "./engine-review.mjs";
+import { readUpload } from "./upload.mjs";
 import { serveWebAsset } from "./web-assets.mjs";
 import { createCatalogSync, catalogSyncError } from "./catalog-sync.mjs";
 import { createSearch } from "./search.mjs";
 import { sdkInfo } from "./sdk-info.mjs";
 import { mappedPlateInputs, resolveMappedPlates } from "./mapped-plates.mjs";
 import { inspectProject } from "./project-inspection.mjs";
+import { randomBytes } from "node:crypto";
 import { createHash } from "node:crypto";
 import { validateCatalogQuery } from "./catalog.mjs";
 import { resolveMappedInput, validateMappedInput } from "./project-data.mjs";
 import { createServer } from "node:http";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { clientFromEnv } from "./client.mjs";
 import { createOrders, validateOrder } from "./orders.mjs";
 
-export const MAX_UPLOAD_BYTES = 16 * 1024 * 1024;
+export const MAX_UPLOAD_BYTES = 150 * 1024 * 1024;
 const builtFrontend = fileURLToPath(new URL("../dist/", import.meta.url));
 
 async function readBody(req, limit) {
@@ -29,7 +32,7 @@ async function readBody(req, limit) {
   return Buffer.concat(chunks);
 }
 
-export function createOrderServer({ hive, control, catalog, directory = "data", designs = "fixtures", baseUrl = "https://api.printhiv3d.com", frontendDirectory = builtFrontend }) {
+export function createOrderServer({ hive, control, catalog, directory = "data", designs = "fixtures", baseUrl = "https://api.printhiv3d.com", frontendDirectory = builtFrontend, browserOrigin }) {
   const orders = createOrders(hive, directory);
   const sync = createCatalogSync(hive);
   const searchAdapter = createSearch(hive);
@@ -38,16 +41,34 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
   const target = new URL(baseUrl);
   const displayUrl = target.origin + target.pathname.replace(/\/$/, "");
   const production = target.hostname === "api.printhiv3d.com";
-  return createServer(async (req, res) => {
+  const sessionToken = randomBytes(32).toString("hex");
+  let uploading = false;
+  const server = createServer({ requestTimeout: 10 * 60 * 1000 }, async (req, res) => {
     const reply = (code, body) => {
       res.writeHead(code, { "content-type": "application/json", "cache-control": "no-store" });
       res.end(JSON.stringify(body));
     };
     let temporary;
+    let ownsUpload = false;
+    const upload = async () => {
+      if (uploading) throw Object.assign(new Error("Another upload is in progress"), { status: 429 });
+      uploading = ownsUpload = true;
+      temporary = await mkdtemp(join(tmpdir(), "printhive-upload-"));
+      return readUpload(req, temporary, MAX_UPLOAD_BYTES);
+    };
     try {
+      const port = req.socket.localPort;
+      const hosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
+      if (!hosts.has(req.headers.host)) return reply(403, { error: "Untrusted Host" });
+      const origins = new Set([...hosts].map(host => `http://${host}`));
+      if (browserOrigin) origins.add(browserOrigin);
+      if (req.headers.origin && !origins.has(req.headers.origin)) return reply(403, { error: "Untrusted Origin" });
+      if (req.headers["sec-fetch-site"] === "cross-site") return reply(403, { error: "Cross-site request refused" });
       const pathname = new URL(req.url, "http://localhost").pathname;
+      if (req.method === "GET" && pathname === "/session") return reply(200, { token: sessionToken });
       const parts = pathname.split("/").filter(Boolean).map(decodeURIComponent);
       if (req.method === "GET" && await serveWebAsset(pathname, res, frontendDirectory)) return;
+      if (req.headers["x-printhive-session"] !== sessionToken) return reply(403, { error: "Missing or invalid session header", code: "invalid_session" });
       if (pathname.startsWith("/catalog-sync/")) {
         try {
           if (req.method === "POST" && ["/catalog-sync/preview", "/catalog-sync/upsert"].includes(pathname)) {
@@ -80,15 +101,8 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
       }
       if (req.method === "POST" && pathname === "/project-data/inspect") {
         if (!req.headers["content-type"]?.startsWith("multipart/form-data")) return reply(400, { error: "Upload the project as multipart/form-data" });
-        const body = await readBody(req, MAX_UPLOAD_BYTES);
-        let form;
-        try { form = await new Response(body, { headers: { "content-type": req.headers["content-type"] } }).formData(); }
-        catch { return reply(400, { error: "Project upload is not valid multipart data" }); }
-        const files = form.getAll("file");
-        const file = files[0];
-        if (files.length !== 1 || !file || typeof file === "string" || !file.size || !/\.3mf$/i.test(file.name)) return reply(400, { error: "Upload one nonempty .3mf project" });
-        const filename = basename(file.name.replaceAll("\\", "/"));
-        try { return reply(200, await inspectProject(Buffer.from(await file.arrayBuffer()), filename)); }
+        const { file, filename } = await upload();
+        try { return reply(200, await inspectProject(await readFile(file), filename)); }
         catch (error) { return reply(422, { error: error.message }); }
       }
       if (req.method === "GET" && pathname === "/project-data") {
@@ -109,21 +123,13 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
         const type = req.headers["content-type"] ?? "";
         let input;
         if (type.startsWith("multipart/form-data")) {
-          const bytes = await readBody(req, MAX_UPLOAD_BYTES);
-          const form = await new Response(bytes, { headers: { "content-type": type } }).formData();
-          const file = form.get("file");
-          input = JSON.parse(form.get("order"));
-          if (!file || typeof file === "string" || !file.size || !/\.3mf$/i.test(file.name))
-            return reply(400, { error: "Upload a nonempty .3mf file" });
-          // Ignore browser paths and use a private temporary directory per upload.
-          const filename = basename(file.name.replaceAll("\\", "/"));
+          const uploaded = await upload();
+          input = JSON.parse(uploaded.order);
+          const filename = uploaded.filename;
           if (input?.plateMappings !== undefined) mappedPlateInputs(input);
           else if (input?.projectData !== undefined || input?.mappings !== undefined) validateMappedInput(input);
           else validateOrder({ ...input, file: filename });
-          temporary = await mkdtemp(join(tmpdir(), "printhive-upload-"));
-          const source = join(temporary, filename);
-          await writeFile(source, Buffer.from(await file.arrayBuffer()), { mode: 0o600 });
-          input = { ...input, file: source };
+          input = { ...input, file: uploaded.file };
         } else if (type.startsWith("application/json")) {
           input = JSON.parse(await readBody(req, 65536));
           if (typeof input?.file !== "string")
@@ -133,6 +139,9 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
             return reply(400, { error: "File must be inside DESIGN_DIR" });
           input = { ...input, file };
         } else return reply(400, { error: "Use application/json or multipart/form-data" });
+        if (input.release === "automatic" && (input.automaticConfirmed !== true ||
+          input.confirmedDestination !== (input.printer_id ?? "smart-queue")))
+          return reply(400, { error: "Confirm automatic printing and its exact destination" });
         if (input?.projectData !== undefined || input?.mappings !== undefined) {
           if (input.plateMappings !== undefined) mappedPlateInputs(input);
           else validateMappedInput(input);
@@ -144,22 +153,26 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
         const record = await orders.submit(input);
         return reply(202, {
           id: record.id,
-          requests: record.plates.map(({ plate, requestId }) => ({ plate, requestId })),
+          requests: record.plates.map(({ plate, requestId }) => ({ plate, requestId: requestId ?? null })),
         });
+      }
+      if (req.method === "POST" && parts[0] === "orders" && parts.length === 3 && parts[2] === "retry") {
+        const record = await orders.retry(parts[1]);
+        return reply(202, { id: record.id, requests: record.plates.map(({ plate, requestId }) => ({ plate, requestId: requestId ?? null })) });
       }
       if (req.method === "GET" && parts[0] === "orders" && parts.length === 2)
         return reply(200, await orders.status(parts[1]));
-      if (req.method === "POST" && parts[0] === "orders" && parts.length === 4 && ["release", "cancel"].includes(parts[3])) {
-        const status = await orders.status(parts[1]);
-        const item = status.plates.find((p) => p.plate === Number(parts[2]));
+      if (req.method === "POST" && parts[0] === "orders" && parts.length === 4 && ["release", "cancel", "approve-review"].includes(parts[3])) {
+        const record = await orders.load(parts[1]);
+        const item = record.plates.find((p) => p.plate === Number(parts[2]));
         if (!item?.requestId) return reply(404, { error: "Plate request not found" });
-        return reply(200, await control(item.requestId, parts[3]));
+        return reply(200, await control(item.requestId, parts[3], parts[3] === "approve-review" ? engineReviewSchema.parse(JSON.parse(await readBody(req, 65536))) : undefined));
       }
       reply(404, { error: "Not found" });
     } catch (error) {
       const upstreamStatus = Number.isInteger(error.status) ? error.status : undefined;
       const code = typeof error.code === "string" && /^[a-z0-9_:.-]{1,80}$/i.test(error.code) ? error.code : undefined;
-      const status = error.code === "ENOENT" ? 404 : [413, 422, 503].includes(upstreamStatus) ? upstreamStatus : 400;
+      const status = error.code === "ENOENT" ? 404 : [413, 422, 429, 503].includes(upstreamStatus) ? upstreamStatus : 400;
       const messages = {
         413: "Request too large",
         422: "Hive rejected this request; no job was accepted. Review the API code and request status before changing or retrying.",
@@ -167,14 +180,17 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
       };
       reply(status, { error: messages[status] ?? "Order operation failed; check input or read status before retrying", code, upstreamStatus });
     } finally {
+      if (ownsUpload) uploading = false;
       if (temporary) await rm(temporary, { recursive: true, force: true });
     }
   });
+  return server;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const server = createOrderServer({
     ...clientFromEnv(),
+    browserOrigin: process.env.PRINTHIVE_BROWSER_ORIGIN,
     directory: process.env.ORDER_DATA_DIR ?? "data",
     designs: process.env.DESIGN_DIR ?? "fixtures",
     baseUrl: process.env.PRINTHIVE_BASE_URL ?? "https://api.printhiv3d.com",

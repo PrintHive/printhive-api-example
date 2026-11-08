@@ -1,3 +1,4 @@
+import { localFetch } from "./local-fetch.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
@@ -10,7 +11,7 @@ test('uploading a project extracts actual plates and palette without creating a 
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   t.after(async () => { server.closeAllConnections(); await new Promise((r) => server.close(r)); });
   const form = new FormData(); form.set('file', new Blob([await readFile('proof/filament-mapping/three-plate.3mf')]), 'three-plate.3mf');
-  const response = await fetch(`http://127.0.0.1:${server.address().port}/project-data/inspect`, { method: 'POST', body: form });
+  const response = await localFetch(`http://127.0.0.1:${server.address().port}/project-data/inspect`, { method: 'POST', body: form });
   assert.equal(response.status, 200);
   const data = await response.json();
   assert.deepEqual(data.plates.map((p) => p.number), [1, 2, 3]);
@@ -37,7 +38,7 @@ test('extracts exact sparse plate IDs and palette indices without treating palet
 test('malformed and unsupported archives fail explicitly instead of inventing plate 1', async () => {
   await assert.rejects(inspectProject(Buffer.from('not a ZIP'), 'bad.3mf'), /valid ZIP/);
   await assert.rejects(inspectProject(Buffer.alloc(0), 'empty.3mf'), /nonempty/);
-  await assert.rejects(inspectProject(Buffer.alloc(16 * 1024 * 1024 + 1), 'large.3mf'), /16 MiB/);
+  await assert.rejects(inspectProject(Buffer.alloc(150 * 1024 * 1024 + 1), 'large.3mf'), /150 MiB/);
   for (const name of ['unsafe-path', 'dtd', 'bad-xml', 'bad-json', 'missing-metadata', 'oversized-metadata', 'duplicate-plates', 'no-plates', 'too-many-entries', 'symlink']) {
     await assert.rejects(inspectProject(await readFile(`test/fixtures/project-inspection/${name}.3mf`), `${name}.3mf`), undefined, name);
   }
@@ -49,13 +50,13 @@ test('extraction endpoint rejects missing files, bad archives and oversize HTTP 
   t.after(async () => { server.closeAllConnections(); await new Promise((r) => server.close(r)); });
   const url = `http://127.0.0.1:${server.address().port}/project-data/inspect`;
   const missing = new FormData(); missing.set('text', 'not a file');
-  assert.equal((await fetch(url, { method: 'POST', body: missing })).status, 400);
+  assert.equal((await localFetch(url, { method: 'POST', body: missing })).status, 400);
   const invalid = new FormData(); invalid.set('file', new Blob(['bad ZIP']), 'bad.3mf');
-  const failed = await fetch(url, { method: 'POST', body: invalid });
+  const failed = await localFetch(url, { method: 'POST', body: invalid });
   assert.equal(failed.status, 422);
   assert.match((await failed.json()).error, /valid ZIP/);
-  const huge = new FormData(); huge.set('file', new Blob([Buffer.alloc(16 * 1024 * 1024)]), 'large.3mf');
-  assert.equal((await fetch(url, { method: 'POST', body: huge })).status, 413);
+  const huge = new FormData(); huge.set('file', new Blob([Buffer.alloc(150 * 1024 * 1024 + 1)]), 'large.3mf');
+  assert.equal((await localFetch(url, { method: 'POST', body: huge })).status, 413);
   assert.equal(creates, 0);
 });
 

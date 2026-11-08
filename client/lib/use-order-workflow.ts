@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { engineReviewFor } from "../../src/engine-review.mjs";
 import { z } from "zod";
 import { validateProjectData } from "../../src/project-data.mjs";
 import { mappedPlateInputs } from "../../src/mapped-plates.mjs";
 import { shouldPollJob } from "../../src/job-status.mjs";
-import { pruneSlots, sharedSourcePlates } from "./material-assignments";
+import { pruneSlots, sharedSourcePlates, selectedSourceGroups } from "./material-assignments";
 import {
+  LocalApiError,
   acceptedSchema,
   api,
   configSchema,
@@ -26,6 +28,8 @@ import {
   type Source,
 } from "./api";
 
+const sessionOrderKey = "printhive-active-order";
+const savedOrderSchema = z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/), plates: z.array(z.number().int().positive()) });
 type Active = { id: string; plates: number[]; options: RequestInit | null };
 export function useOrderWorkflow() {
   const [config, setConfig] = useState<Config | null>(null);
@@ -45,6 +49,9 @@ export function useOrderWorkflow() {
   const [hints, setHints] = useState<Record<number, Record<number, Hint>>>({});
   const [bulkNotice, setBulkNotice] = useState("");
   const [printer, setPrinter] = useState("");
+  const [printerName, setPrinterName] = useState("");
+  const [mappingMode, setMappingMode] = useState<"selected" | "plate">("selected");
+  const [automaticConfirmation, setAutomaticConfirmation] = useState<string | null>(null);
   const [release, setRelease] = useState("manual");
   const [policy, setPolicy] = useState("wait");
   const [manifest, setManifest] = useState("");
@@ -56,6 +63,13 @@ export function useOrderWorkflow() {
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
   const [submitted, setSubmitted] = useState(false);
+  const settled = Boolean(active && !busy && order?.plates.length && order.plates.every(p => ["created", "failed", "cancelled"].includes(p.status)));
+  useEffect(() => {
+    if (!active || settled) return;
+    const guard = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", guard);
+    return () => window.removeEventListener("beforeunload", guard);
+  }, [active, settled]);
   const [error, setError] = useState("");
   const [payload, setPayload] = useState<unknown>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
@@ -120,6 +134,22 @@ export function useOrderWorkflow() {
     );
   };
   const currentSources = plateSources(plateNumber);
+  const sourceGroups = selectedSourceGroups(selectedPlates.map(number => ({ number, sources: plateSources(number) })));
+  function chooseGroup(source: Source, material: Material) {
+    const group = sourceGroups.find(group => group.source === source);
+    if (!group) return;
+    setSelections(previous => {
+      const next = { ...previous };
+      for (const number of group.plates) next[number] = { ...next[number], [source.sourceSlot]: material };
+      return next;
+    });
+    invalidate();
+  }
+  function groupSelection(source: Source, plates: number[]) {
+    const choices = plates.map(number => selections[number]?.[source.sourceSlot]);
+    const first = choices[0];
+    return first && choices.every(choice => choice?.id === first.id) ? first : undefined;
+  }
   const bulkTargets = (slot: number): number[] => {
     const anchor = currentSources.find((s) => s.sourceSlot === slot);
     if (!anchor || !currentSelections[slot]) return [];
@@ -134,6 +164,7 @@ export function useOrderWorkflow() {
     previewGeneration.current++;
     previewController.current?.abort();
     setPayload(null);
+    setAutomaticConfirmation(null);
     setPreviewBusy(false);
   }, []);
   const clearProject = useCallback(() => {
@@ -203,8 +234,8 @@ export function useOrderWorkflow() {
     try {
       if (!/\.3mf$/i.test(value.name) || !value.size)
         throw new Error("Choose a nonempty .3mf project");
-      if (value.size > 16 * 1024 * 1024 - 65536)
-        throw new Error("Choose a 3MF smaller than 16 MiB including form data");
+      if (value.size > 150 * 1024 * 1024)
+        throw new Error("Choose a 3MF no larger than 150 MiB");
       const body = new FormData();
       body.set("file", value);
       const data = await api("/project-data/inspect", extractionSchema, {
@@ -306,6 +337,21 @@ export function useOrderWorkflow() {
     setHints((p) => pruneSlots(p, plateNumber, kept));
     invalidate();
   }
+  function confirmSelectedUsage() {
+    if (!extracted) return;
+    setConfirmed(previous => {
+      const next = { ...previous };
+      for (const number of selectedPlates) {
+        const usage = usageFor(number);
+        if (usage?.kind !== "detected" || !usage.sourceSlots?.length || drafts[number]) continue;
+        const values = extracted.palette.filter(source => usage.sourceSlots?.includes(source.sourceSlot));
+        if (values.length === usage.sourceSlots.length && values.every(source => source.selectable))
+          next[number] = plateSchema.parse({ number, filaments: values });
+      }
+      return next;
+    });
+    invalidate();
+  }
   function applyToMatching(slot: number) {
     const material = currentSelections[slot];
     const targets = bulkTargets(slot);
@@ -329,6 +375,8 @@ export function useOrderWorkflow() {
       if (!plate) throw new Error(`Confirm source usage for plate ${number}`);
       return plate;
     });
+    if (printer.trim() && !z.string().uuid().safeParse(printer.trim()).success)
+      throw new Error("Printer ID must be a UUID or empty for Smart Queue");
     const input: MappedInput = {
       id: `browser-${crypto.randomUUID()}`,
       plates: selectedPlates,
@@ -425,58 +473,83 @@ export function useOrderWorkflow() {
       )
         timer.current = setTimeout(() => {
           void refresh();
-        }, 1000);
+        }, value.plates.some(receipt => receipt.status === "created") ? 5000 : 2000);
     } catch (e) {
       if (
         !controller.signal.aborted &&
         mounted.current &&
         generation === pollGeneration.current
       ) {
-        setError(`${message(e)}. Status is unknown. Polling will retry.`);
+        if (!(e instanceof LocalApiError && e.status === 404 && current.options))
+          setError(`${message(e)}. Status is unknown. Polling will retry.`);
         timer.current = setTimeout(() => {
           void refresh();
         }, 3000);
       }
     }
   }, []);
-  async function submit() {
+  useEffect(() => {
+    if (activeRef.current) { void refresh(); return; }
+    const stored = sessionStorage.getItem(sessionOrderKey);
+    if (!stored) return;
+    try {
+      const saved = savedOrderSchema.parse(JSON.parse(stored));
+      const resumed = { ...saved, options: null };
+      activeRef.current = resumed;
+      setActive(resumed);
+      setStatusPlate(saved.plates[0] ?? 1);
+      setSubmitted(true);
+      void refresh();
+    } catch { sessionStorage.removeItem(sessionOrderKey); }
+  }, [refresh]);
+  async function submit(automaticConfirmed = false) {
     if (locked.current || !config) return;
     locked.current = true;
     setBusy(true);
     setError("");
-    clearTimeout(timer.current);
     try {
       let current = activeRef.current;
       if (!current) {
         const input = currentInput();
+        if (release === "automatic" && printer.trim() && !printerName)
+          throw new Error("For automatic release, choose the printer through search so the confirmation names its destination.");
+        if (release === "automatic" && !automaticConfirmed) {
+          setAutomaticConfirmation(printer.trim() ? printerName : "Smart Queue");
+          return;
+        }
+        setAutomaticConfirmation(null);
+        const confirmedInput = { ...input, ...(release === "automatic" ? {
+          automaticConfirmed: true, confirmedDestination: input.printer_id ?? "smart-queue",
+        } : {}) };
         let options: RequestInit;
         if (file) {
           const body = new FormData();
-          body.set("order", JSON.stringify(input));
+          body.set("order", JSON.stringify(confirmedInput));
           body.set("file", file);
           options = { method: "POST", body };
-        } else options = json({ ...input, file: "cube.3mf" });
+        } else options = json({ ...confirmedInput, file: "cube.3mf" });
         current = { id: input.id, plates: input.plates, options };
         setStatusPlate(input.plates[0] ?? 1);
+        sessionStorage.setItem(sessionOrderKey, JSON.stringify({ id: current.id, plates: current.plates }));
         activeRef.current = current;
         setActive(current);
+        void refresh();
       }
-      if (!current.options) return;
-      await api("/orders", acceptedSchema, current.options);
+      await api(current.options ? "/orders" : `/orders/${encodeURIComponent(current.id)}/retry`, acceptedSchema, current.options ?? { method: "POST" });
       current.options = null;
       setSubmitted(true);
       await refresh();
     } catch (e) {
       if (activeRef.current) await refresh();
       setError(
-        `${message(e)}${activeRef.current ? ". Retry preserves this order ID. Reload to change the input." : ""}`,
+        `${message(e)}${activeRef.current ? ". Follow per-plate status here. Do not create another order while status is unknown." : ""}`,
       );
     } finally {
       locked.current = false;
       setBusy(false);
     }
   }
-  async function action(kind: "release" | "cancel", plate = statusPlate) {
+  async function action(kind: "release" | "cancel" | "approve-review", plate = statusPlate) {
     const current = activeRef.current;
     if (!current || locked.current) return;
     locked.current = true;
@@ -487,7 +560,7 @@ export function useOrderWorkflow() {
       await api(
         `/orders/${encodeURIComponent(current.id)}/${plate}/${kind}`,
         receiptSchemaForAction,
-        { method: "POST" },
+        kind === "approve-review" ? json(engineReviewFor(order?.plates.find(p => p.plate === plate)?.requiredActions ?? [])) : { method: "POST" },
       );
     } catch (e) {
       failure = `${message(e)}. Status refreshed; check before retrying this action.`;
@@ -519,6 +592,22 @@ export function useOrderWorkflow() {
       invalidate();
     },
     currentSources,
+    sourceGroups,
+    chooseGroup,
+    groupSelection,
+    groupHint: (source: Source, plates: number[]) => hints[plates[0] ?? 0]?.[source.sourceSlot],
+    setGroupHint: (source: Source, plates: number[], hint: Hint) => {
+      setHints(previous => {
+        const next = { ...previous };
+        for (const number of plates) next[number] = { ...next[number], [source.sourceSlot]: hint };
+        return next;
+      });
+      invalidate();
+    },
+    mappingMode,
+    setMappingMode: (value: "selected" | "plate") => { setMappingMode(value); invalidate(); },
+    confirmSelectedUsage,
+    printerName,
     bulkTargets,
     bulkNotice,
     confirmed,
@@ -531,6 +620,9 @@ export function useOrderWorkflow() {
     hints: hints[plateNumber] ?? {},
     printer,
     release,
+    automaticConfirmation,
+    cancelAutomatic: () => setAutomaticConfirmation(null),
+    confirmAutomatic: () => submit(true),
     policy,
     manifest,
     projectError,
@@ -539,6 +631,7 @@ export function useOrderWorkflow() {
     order,
     busy,
     submitted,
+    settled,
     error,
     payload,
     previewBusy,
@@ -558,8 +651,9 @@ export function useOrderWorkflow() {
       setPlateNumber(number);
       invalidate();
     },
-    setPrinter: (value: string) => {
-      setPrinter(value);
+    setPrinter: (value: string, name = "") => {
+      setPrinter(value.trim());
+      setPrinterName(name);
       invalidate();
     },
     setRelease: (value: string) => {
@@ -585,7 +679,20 @@ export function useOrderWorkflow() {
       }));
       invalidate();
     },
-    newOrder: () => window.location.reload(),
+    newOrder: () => {
+      if (!settled) return;
+      clearTimeout(timer.current);
+      pollGeneration.current++;
+      pollController.current?.abort();
+      sessionStorage.removeItem(sessionOrderKey);
+      activeRef.current = null;
+      setActive(null);
+      setOrder(null);
+      setSubmitted(false);
+      setError("");
+      setRelease("manual");
+      invalidate();
+    },
   };
 }
 const receiptSchemaForAction = z.unknown();

@@ -1,3 +1,4 @@
+import { localFetch } from "./local-fetch.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, mkdtemp, rm, readdir, writeFile } from 'node:fs/promises';
@@ -53,11 +54,11 @@ test('HTTP preview and one multipart upload preserve per-plate mappings', async 
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   t.after(async () => { server.closeAllConnections(); await new Promise(r => server.close(r)); });
   const url = `http://127.0.0.1:${server.address().port}`;
-  const preview = await fetch(url + '/orders/preview', { method: 'POST', body: JSON.stringify(f.input) });
+  const preview = await localFetch(url + '/orders/preview', { method: 'POST', body: JSON.stringify(f.input) });
   assert.deepEqual(await preview.json(), { plates: [{ plate: 2, filaments: [{ sourceSlot: 0, filamentId: a }] }, { plate: 7, filaments: [{ sourceSlot: 0, filamentId: b }] }] });
   assert.equal(calls.length, 0);
   const form = new FormData(); form.set('order', JSON.stringify(f.input)); form.set('file', new Blob([f.bytes]), 'valid.3mf');
-  const submitted = await fetch(url + '/orders', { method: 'POST', body: form });
+  const submitted = await localFetch(url + '/orders', { method: 'POST', body: form });
   assert.equal(submitted.status, 202);
   assert.deepEqual((await submitted.json()).requests, [{ plate: 2, requestId: 'request-2' }, { plate: 7, requestId: 'request-7' }]);
 });
@@ -81,4 +82,67 @@ test('batches stored before catalog IDs replay their saved per-plate requirement
   assert.deepEqual(calls.map(v => v.plate), [2, 7, 7]);
   assert.deepEqual(calls[2].filaments, [{ sourceSlot: 0, material: 'PETG', color: '#296AAB' }]);
   assert.equal(calls[2].idempotencyKey, saved.plates[1].idempotencyKey);
+});
+
+test('one failed send or poll does not hide progress for sibling plates', async t => {
+  const f = await fixture(t), sent = [];
+  const hive = { printJobs: {
+    create: async value => {
+      sent.push(value);
+      if (value.plate === 2) throw Object.assign(new Error('refused'), { code: 'catalog_store_failed', status: 503 });
+      return { requestId: 'request-7' };
+    },
+    getCreateRequest: async () => ({ status: 'held', requestId: 'request-7', requiredActions: [{ code: 'manual_release_required' }] }),
+  } };
+  const orders = createOrders(hive, f.directory);
+  await assert.rejects(orders.submit(f.input), /refused/);
+  assert.deepEqual(sent.map(value => value.plate), [2, 7]);
+  let status = await orders.status(f.input.id);
+  assert.equal(status.plates[0].status, 'pending_submission');
+  assert.equal(status.plates[0].error.code, 'catalog_store_failed');
+  assert.equal(status.plates[1].status, 'held');
+  hive.printJobs.getCreateRequest = async () => { throw Object.assign(new Error('offline'), { code: 'upstream_unavailable' }); };
+  status = await orders.status(f.input.id);
+  assert.equal(status.plates[0].status, 'pending_submission');
+  assert.equal(status.plates[1].status, 'status_unavailable');
+  assert.equal(status.plates[1].error.code, 'upstream_unavailable');
+});
+
+test('4xx rejections are final with upstream details while transport, 429 and 5xx can retry', async t => {
+  for (const status of [null, 400, 403, 422, 429, 500, 503]) {
+    const f = await fixture(t); let calls = 0;
+    const failure = Object.assign(new Error('Rejected'), { ...(status ? { status } : {}), code: 'filaments_do_not_cover_plate', body: { message: 'Missing used sources', missingSlots: [3], reasons: ['source slot 3 is unmapped'] } });
+    const hive = { printJobs: { create: async () => { calls++; throw failure; } } };
+    const orders = createOrders(hive, f.directory);
+    await assert.rejects(orders.submit(f.input));
+    const snapshot = await orders.status(f.input.id);
+    const retryable = status === null || status === 429 || status >= 500;
+    assert.equal(snapshot.plates[0].status, retryable ? 'pending_submission' : 'failed');
+    assert.deepEqual(snapshot.plates[0].error, { code: failure.code, message: 'Missing used sources', missingSlots: [3], reasons: ['source slot 3 is unmapped'], upstreamStatus: status, retryable, ...(retryable ? { retryAdvice: 'Not confirmed by Hive. Retry the same order with its saved key.' } : {}) });
+    await createOrders(hive, f.directory).retry(f.input.id).catch(() => {});
+    assert.equal(calls, retryable ? 4 : 2);
+  }
+});
+
+test('status is visible during sequential uploads and disk-only retry after restart preserves all keys', async t => {
+  const f = await fixture(t), calls = [];
+  let unblock, started;
+  const waiting = new Promise(resolve => { started = resolve; });
+  const block = new Promise(resolve => { unblock = resolve; });
+  const hive = { printJobs: {
+    create: async value => { calls.push(value); if (value.plate === 2) { started(); await block; return { requestId: 'request-2' }; } throw new Error('offline'); },
+    getCreateRequest: async requestId => ({ requestId, status: 'held', plate: 999, requiredActions: [{ code: 'manual_release_required' }] }),
+  } };
+  const orders = createOrders(hive, f.directory);
+  const submission = orders.submit(f.input);
+  await waiting;
+  assert.deepEqual((await orders.status(f.input.id)).plates.map(p => p.status), ['pending_submission', 'pending_submission']);
+  unblock(); await assert.rejects(submission);
+  const before = JSON.parse(await readFile(join(f.directory, f.input.id + '.json'), 'utf8'));
+  hive.printJobs.create = async value => { calls.push(value); return { requestId: 'request-7' }; };
+  const restarted = createOrders(hive, f.directory);
+  await restarted.retry(f.input.id);
+  assert.deepEqual(calls.map(c => c.plate), [2, 7, 7]);
+  assert.equal(calls[2].idempotencyKey, before.plates[1].idempotencyKey);
+  assert.deepEqual((await restarted.status(f.input.id)).plates.map(p => [p.plate, p.status]), [[2, 'held'], [7, 'held']]);
 });
