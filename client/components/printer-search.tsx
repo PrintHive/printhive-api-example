@@ -12,7 +12,7 @@ export function PrinterSearch({
   choose,
 }: {
   disabled: boolean;
-  choose: (id: string) => void;
+  choose: (id: string, name: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState<Page | null>(null);
@@ -101,7 +101,7 @@ export function PrinterSearch({
             variant="outline"
             size="sm"
             disabled={disabled}
-            onClick={() => choose(printer.id)}
+            onClick={() => choose(printer.id, printer.name)}
           >
             Use {printer.name}
           </Button>

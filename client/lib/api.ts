@@ -190,12 +190,22 @@ export function message(error: unknown): string {
     ? error.message
     : "The request could not be completed";
 }
+let session: Promise<string> | undefined;
+async function sessionToken() {
+  session ??= fetch("/session").then(async response => {
+    if (!response.ok) throw new Error("Cannot open local session. Reload the sample.");
+    return z.object({ token: z.string().min(1) }).parse(await response.json()).token;
+  }).catch(error => { session = undefined; throw error; });
+  return session;
+}
 export async function api<T>(
   path: string,
   schema: z.ZodType<T>,
   options?: RequestInit,
 ): Promise<T> {
-  const response = await fetch(path, options);
+  const headers = new Headers(options?.headers);
+  headers.set("x-printhive-session", await sessionToken());
+  const response = await fetch(path, { ...options, headers });
   const data: unknown = await response.json();
   if (!response.ok) {
     const error = errorSchema.safeParse(data);

@@ -3,7 +3,7 @@ const apiPort = process.env.API_PORT ?? "3078";
 const children = [
   spawn(process.execPath, ["src/server.mjs"], {
     stdio: "inherit",
-    env: { ...process.env, PORT: apiPort },
+    env: { ...process.env, PORT: apiPort, PRINTHIVE_BROWSER_ORIGIN: "http://127.0.0.1:5173" },
   }),
   spawn(process.execPath, ["node_modules/vite/bin/vite.js"], {
     stdio: "inherit",

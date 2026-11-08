@@ -1,0 +1,420 @@
+TAP version 13
+# Subtest: batch validation canonicalizes aliases and rejects invalid imports before any SDK call
+ok 1 - batch validation canonicalizes aliases and rejects invalid imports before any SDK call
+  ---
+  duration_ms: 4.410084
+  ...
+# Subtest: explicit sequential upserts retain stable identity and return partial outcomes safely
+ok 2 - explicit sequential upserts retain stable identity and return partial outcomes safely
+  ---
+  duration_ms: 0.358084
+  ...
+# Subtest: catalog list and read use SDK methods and sanitize permissions or malformed responses
+ok 3 - catalog list and read use SDK methods and sanitize permissions or malformed responses
+  ---
+  duration_ms: 0.422167
+  ...
+# Subtest: preview routes never sync; explicit upsert, list and get use only injected SDK catalog
+ok 4 - preview routes never sync; explicit upsert, list and get use only injected SDK catalog
+  ---
+  duration_ms: 84.527125
+  ...
+# Subtest: older SDK capability fails cleanly without HTTP fallback and preview remains read-only
+ok 5 - older SDK capability fails cleanly without HTTP fallback and preview remains read-only
+  ---
+  duration_ms: 17.016167
+  ...
+# Subtest: catalog HTTP errors and invalid JSON never expose upstream secrets
+ok 6 - catalog HTTP errors and invalid JSON never expose upstream secrets
+  ---
+  duration_ms: 6.951625
+  ...
+# Subtest: filament search uses the SDK picker route with the server key and keeps Hive admission verdicts visible
+ok 7 - filament search uses the SDK picker route with the server key and keeps Hive admission verdicts visible
+  ---
+  duration_ms: 35.243083
+  ...
+# Subtest: exact IDs and browse queries go through the same SDK search; no catalog row or materials route is ever requested
+ok 8 - exact IDs and browse queries go through the same SDK search; no catalog row or materials route is ever requested
+  ---
+  duration_ms: 2.351167
+  ...
+# Subtest: denied, drifted and malformed search responses fail without exposing the key or inventing rows
+ok 9 - denied, drifted and malformed search responses fail without exposing the key or inventing rows
+  ---
+  duration_ms: 3.107459
+  ...
+# Subtest: normalizer: the search verdict alone decides selection; display fields never override it
+ok 10 - normalizer: the search verdict alone decides selection; display fields never override it
+  ---
+  duration_ms: 0.546667
+  ...
+# Subtest: Vite serves the React entry and shared browser helpers without exposing order storage or backend source
+ok 11 - Vite serves the React entry and shared browser helpers without exposing order storage or backend source
+  ---
+  duration_ms: 478.58075
+  ...
+# Subtest: dev proxy supports the local session and rewrites Host while checking browser Origin
+ok 12 - dev proxy supports the local session and rewrites Host while checking browser Origin
+  ---
+  duration_ms: 83.225709
+  ...
+# Subtest: enabled global filaments are selectable on the search verdict alone; refused and excluded rows are not
+ok 13 - enabled global filaments are selectable on the search verdict alone; refused and excluded rows are not
+  ---
+  duration_ms: 59.288917
+  ...
+# Subtest: single and multi-plate previews carry the global catalog ID without any catalog or materials read
+ok 14 - single and multi-plate previews carry the global catalog ID without any catalog or materials read
+  ---
+  duration_ms: 32.628958
+  ...
+# Subtest: multipart creation sends ID-only requirements with zero-based slots and hints, stores identity records, and retries with the saved key
+ok 15 - multipart creation sends ID-only requirements with zero-based slots and hints, stores identity records, and retries with the saved key
+  ---
+  duration_ms: 187.400084
+  ...
+# Subtest: an upstream 503 catalog_store_failed returns 503 with a safe code, and an unchanged retry reuses the saved key
+ok 16 - an upstream 503 catalog_store_failed returns 503 with a safe code, and an unchanged retry reuses the saved key
+  ---
+  duration_ms: 176.96725
+  ...
+# Subtest: the installed SDK retries an eligible 503 with the same key before the sample reports it
+ok 17 - the installed SDK retries an eligible 503 with the same key before the sample reports it
+  ---
+  duration_ms: 390.018666
+  ...
+# Subtest: explicit material and color travel to Hive unchanged; a contradiction returns the 422 code and local shape errors stop first
+ok 18 - explicit material and color travel to Hive unchanged; a contradiction returns the 422 code and local shape errors stop first
+  ---
+  duration_ms: 38.288875
+  ...
+# Subtest: validateOrder accepts catalog-ID or typed requirements and rejects partial ones
+ok 19 - validateOrder accepts catalog-ID or typed requirements and rejects partial ones
+  ---
+  duration_ms: 0.48975
+  ...
+# Subtest: orders saved by the 0.3.2 and 0.4.0 samples replay their stored requirements byte-for-byte with the saved keys
+ok 20 - orders saved by the 0.3.2 and 0.4.0 samples replay their stored requirements byte-for-byte with the saved keys
+  ---
+  duration_ms: 121.262125
+  ...
+# Subtest: slot-conflict guidance distinguishes explicit placement from another needed spool
+ok 21 - slot-conflict guidance distinguishes explicit placement from another needed spool
+  ---
+  duration_ms: 0.772417
+  ...
+# Subtest: uncertain readings do not become loading instructions and distance hints remain advisory
+ok 22 - uncertain readings do not become loading instructions and distance hints remain advisory
+  ---
+  duration_ms: 0.110292
+  ...
+# Subtest: three of four loaded: display API-reported unmet source without inventing its physical slot
+ok 23 - three of four loaded: display API-reported unmet source without inventing its physical slot
+  ---
+  duration_ms: 0.086875
+  ...
+# Subtest: waiting instructions explain each cause while keeping optional and future causes readable
+ok 24 - waiting instructions explain each cause while keeping optional and future causes readable
+  ---
+  duration_ms: 0.213291
+  ...
+# Subtest: waiting color normalization rejects CSS and preserves only the returned sparse source identities
+ok 25 - waiting color normalization rejects CSS and preserves only the returned sparse source identities
+  ---
+  duration_ms: 0.3365
+  ...
+# Subtest: only API-supplied target indices identify a tray; route-change reasons remain actionable
+ok 26 - only API-supplied target indices identify a tray; route-change reasons remain actionable
+  ---
+  duration_ms: 0.065958
+  ...
+# Subtest: created request reads actual job status and waiting reasons, without treating creation as matched
+ok 27 - created request reads actual job status and waiting reasons, without treating creation as matched
+  ---
+  duration_ms: 0.125041
+  ...
+# Subtest: held receipt is not a job; deleted, old SDK and uncertain read stay distinct
+ok 28 - held receipt is not a job; deleted, old SDK and uncertain read stay distinct
+  ---
+  duration_ms: 0.269
+  ...
+# Subtest: terminal API job statuses stop polling and revoked access requires credential correction
+ok 29 - terminal API job statuses stop polling and revoked access requires credential correction
+  ---
+  duration_ms: 0.160667
+  ...
+# Subtest: mismatch policy is durable request intent and rejects changed policy on replay
+ok 30 - mismatch policy is durable request intent and rejects changed policy on replay
+  ---
+  duration_ms: 88.497084
+  ...
+# Subtest: updated SDK follows persisted upload through create request and real job snapshot contract
+ok 31 - updated SDK follows persisted upload through create request and real job snapshot contract
+  ---
+  duration_ms: 94.635125
+  ...
+# Subtest: historical omitted wait policy keeps original outbound body and key after lost response
+ok 32 - historical omitted wait policy keeps original outbound body and key after lost response
+  ---
+  duration_ms: 97.472417
+  ...
+# Subtest: mapped placement is pinned before upload and changing a hint cannot silently reuse a saved order
+ok 33 - mapped placement is pinned before upload and changing a hint cannot silently reuse a saved order
+  ---
+  duration_ms: 156.370833
+  ...
+# Subtest: HTTP reject response preserves 422 and safe API code without leaking upstream details
+ok 34 - HTTP reject response preserves 422 and safe API code without leaking upstream details
+  ---
+  duration_ms: 113.774125
+  ...
+# Subtest: server prefers a trimmed key file, falls back to env only when no file was configured, and fails closed
+ok 35 - server prefers a trimmed key file, falls back to env only when no file was configured, and fails closed
+  ---
+  duration_ms: 83.77525
+  ...
+# Subtest: Host, Origin, fetch metadata, and session guard every local API before SDK calls
+ok 36 - Host, Origin, fetch metadata, and session guard every local API before SDK calls
+  ---
+  duration_ms: 89.801167
+  ...
+# Subtest: preview is local validation; submission binds the file and sends the catalog ID without a material snapshot
+ok 37 - preview is local validation; submission binds the file and sends the catalog ID without a material snapshot
+  ---
+  duration_ms: 209.882
+  ...
+# Subtest: changed source or invalid mapping stops before job creation
+ok 38 - changed source or invalid mapping stops before job creation
+  ---
+  duration_ms: 59.488083
+  ...
+# Subtest: lost-response replay resends the saved catalog ID with the saved key
+ok 39 - lost-response replay resends the saved catalog ID with the saved key
+  ---
+  duration_ms: 187.888625
+  ...
+# Subtest: orders stored before catalog IDs replay their saved requirements and keys unchanged
+ok 40 - orders stored before catalog IDs replay their saved requirements and keys unchanged
+  ---
+  duration_ms: 131.069375
+  ...
+# Subtest: the installed SDK sends the catalog ID in one multipart create and never reads the organization catalog row
+ok 41 - the installed SDK sends the catalog ID in one multipart create and never reads the organization catalog row
+  ---
+  duration_ms: 110.019166
+  ...
+# Subtest: one local source snapshot creates only selected plates with independent requirements and durable keys
+ok 42 - one local source snapshot creates only selected plates with independent requirements and durable keys
+  ---
+  duration_ms: 101.6115
+  ...
+# Subtest: a partial batch retries only the unsettled plate with its saved key and requirements
+ok 43 - a partial batch retries only the unsettled plate with its saved key and requirements
+  ---
+  duration_ms: 154.48025
+  ...
+# Subtest: missing, duplicate and foreign plate mapping groups fail before SDK calls
+ok 44 - missing, duplicate and foreign plate mapping groups fail before SDK calls
+  ---
+  duration_ms: 2.630917
+  ...
+# Subtest: HTTP preview and one multipart upload preserve per-plate mappings
+ok 45 - HTTP preview and one multipart upload preserve per-plate mappings
+  ---
+  duration_ms: 186.675041
+  ...
+# Subtest: selecting a subset never submits unselected manifest plates
+ok 46 - selecting a subset never submits unselected manifest plates
+  ---
+  duration_ms: 70.7725
+  ...
+# Subtest: batches stored before catalog IDs replay their saved per-plate requirements and keys unchanged
+ok 47 - batches stored before catalog IDs replay their saved per-plate requirements and keys unchanged
+  ---
+  duration_ms: 105.868166
+  ...
+# Subtest: one failed send or poll does not hide progress for sibling plates
+ok 48 - one failed send or poll does not hide progress for sibling plates
+  ---
+  duration_ms: 73.257625
+  ...
+# Subtest: one durable key per plate; no printer required; concurrent retries do not duplicate
+ok 49 - one durable key per plate; no printer required; concurrent retries do not duplicate
+  ---
+  duration_ms: 103.606583
+  ...
+# Subtest: lost response survives restart with same key and original bytes
+ok 50 - lost response survives restart with same key and original bytes
+  ---
+  duration_ms: 180.191916
+  ...
+# Subtest: printer and manual authorization map to every plate
+ok 51 - printer and manual authorization map to every plate
+  ---
+  duration_ms: 105.794416
+  ...
+# Subtest: SDK polling exposes held receipt
+ok 52 - SDK polling exposes held receipt
+  ---
+  duration_ms: 0.232292
+  ...
+# Subtest: SDK polling exposes failed receipt
+ok 53 - SDK polling exposes failed receipt
+  ---
+  duration_ms: 0.066292
+  ...
+# Subtest: SDK polling exposes cancelled receipt
+ok 54 - SDK polling exposes cancelled receipt
+  ---
+  duration_ms: 0.1225
+  ...
+# Subtest: created with deleted job is retained receipt; network timeout stays unsettled
+ok 55 - created with deleted job is retained receipt; network timeout stays unsettled
+  ---
+  duration_ms: 0.154333
+  ...
+# Subtest: invalid plates fail before a call
+ok 56 - invalid plates fail before a call
+  ---
+  duration_ms: 44.178708
+  ...
+# Subtest: registry SDK sends multipart and raises stopped errors through real polling
+ok 57 - registry SDK sends multipart and raises stopped errors through real polling
+  ---
+  duration_ms: 12.696708
+  ...
+# Subtest: saved plate PNG previews retain exact sparse plate identities and names
+ok 58 - saved plate PNG previews retain exact sparse plate identities and names
+  ---
+  duration_ms: 27.507125
+  ...
+# Subtest: missing, malformed, excessive and unsafe previews never hide plate choices or become URLs
+ok 59 - missing, malformed, excessive and unsafe previews never hide plate choices or become URLs
+  ---
+  duration_ms: 24.35825
+  ...
+# Subtest: per-plate source data preserves original nonconsecutive indices and variants
+ok 60 - per-plate source data preserves original nonconsecutive indices and variants
+  ---
+  duration_ms: 1.59025
+  ...
+# Subtest: duplicate slots, missing colors, invalid mappings and unbound project data are rejected
+ok 61 - duplicate slots, missing colors, invalid mappings and unbound project data are rejected
+  ---
+  duration_ms: 0.268833
+  ...
+# Subtest: selected catalog IDs resolve locally into identity records and ID-only requirements, without any catalog read
+ok 62 - selected catalog IDs resolve locally into identity records and ID-only requirements, without any catalog read
+  ---
+  duration_ms: 0.2
+  ...
+# Subtest: explicit named-printer placement hints preserve their own AMS indices, independent of source order
+ok 63 - explicit named-printer placement hints preserve their own AMS indices, independent of source order
+  ---
+  duration_ms: 0.871542
+  ...
+# Subtest: uploading a project extracts actual plates and palette without creating a job
+ok 64 - uploading a project extracts actual plates and palette without creating a job
+  ---
+  duration_ms: 68.500459
+  ...
+# Subtest: extracts exact sparse plate IDs and palette indices without treating palette as usage
+ok 65 - extracts exact sparse plate IDs and palette indices without treating palette as usage
+  ---
+  duration_ms: 3.4425
+  ...
+# Subtest: malformed and unsupported archives fail explicitly instead of inventing plate 1
+ok 66 - malformed and unsupported archives fail explicitly instead of inventing plate 1
+  ---
+  duration_ms: 66.713583
+  ...
+# Subtest: extraction endpoint rejects missing files, bad archives and oversize HTTP bodies without SDK calls
+ok 67 - extraction endpoint rejects missing files, bad archives and oversize HTTP bodies without SDK calls
+  ---
+  duration_ms: 28.533042
+  ...
+# Subtest: valid plate choices remain available when palette or colors are missing
+ok 68 - valid plate choices remain available when palette or colors are missing
+  ---
+  duration_ms: 4.3755
+  ...
+# Subtest: per-plate JSON hints preserve zero-based indices and distinct same-color filaments
+ok 69 - per-plate JSON hints preserve zero-based indices and distinct same-color filaments
+  ---
+  duration_ms: 3.207875
+  ...
+# Subtest: saved slice XML uses one-based plate and filament IDs without remapping by color
+ok 70 - saved slice XML uses one-based plate and filament IDs without remapping by color
+  ---
+  duration_ms: 5.2525
+  ...
+# Subtest: empty, malformed, conflicting, mixed or out-of-range usage falls back to unresolved full palette
+ok 71 - empty, malformed, conflicting, mixed or out-of-range usage falls back to unresolved full palette
+  ---
+  duration_ms: 23.953916
+  ...
+# Subtest: combined optional metadata inflation stays bounded across plate files
+ok 72 - combined optional metadata inflation stays bounded across plate files
+  ---
+  duration_ms: 27.782834
+  ...
+# Subtest: malformed optional saved metadata does not hide valid project plate choices
+ok 73 - malformed optional saved metadata does not hide valid project plate choices
+  ---
+  duration_ms: 1.632917
+  ...
+# Subtest: saved slice hints omit zero-use rows and require finite positive usage evidence
+ok 74 - saved slice hints omit zero-use rows and require finite positive usage evidence
+  ---
+  duration_ms: 2.96225
+  ...
+# Subtest: workspace provenance requires the loaded package path, not only a matching version
+ok 75 - workspace provenance requires the loaded package path, not only a matching version
+  ---
+  duration_ms: 42.786625
+  ...
+# Subtest: filament search sends free text to /v1/filaments/search and keeps catalog filamentId, paging and match mode
+ok 76 - filament search sends free text to /v1/filaments/search and keeps catalog filamentId, paging and match mode
+  ---
+  duration_ms: 17.60375
+  ...
+# Subtest: printer search sends free text to /v1/printers/search and returns only public picker fields
+ok 77 - printer search sends free text to /v1/printers/search and returns only public picker fields
+  ---
+  duration_ms: 1.27275
+  ...
+# Subtest: the installed SDK provides both search methods; upstream shape drift fails instead of inventing results
+ok 78 - the installed SDK provides both search methods; upstream shape drift fails instead of inventing results
+  ---
+  duration_ms: 1.31925
+  ...
+# Subtest: multipart upload persists source bytes and supports status, release, and cancel
+ok 79 - multipart upload persists source bytes and supports status, release, and cancel
+  ---
+  duration_ms: 238.533792
+  ...
+# Subtest: JSON bundled fixture and allowlisted page assets work without exposing URL secrets
+ok 80 - JSON bundled fixture and allowlisted page assets work without exposing URL secrets
+  ---
+  duration_ms: 123.851
+  ...
+# Subtest: bad input returns 400 before calling Print Hive
+ok 81 - bad input returns 400 before calling Print Hive
+  ---
+  duration_ms: 46.251292
+  ...
+# Subtest: JSON and multipart request byte limits return 413
+ok 82 - JSON and multipart request byte limits return 413
+  ---
+  duration_ms: 40.307167
+  ...
+1..82
+# tests 82
+# suites 0
+# pass 82
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1299.429875

@@ -1,0 +1,8 @@
+
+ RUN  v4.1.10 /private/tmp/printhive-api-example-demo-20261108
+
+
+ Test Files  3 passed (3)
+      Tests  17 passed (17)
+   Start at  08:15:43
+   Duration  3.34s (transform 301ms, setup 297ms, import 869ms, tests 5.56s, environment 806ms)

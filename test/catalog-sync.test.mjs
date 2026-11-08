@@ -1,3 +1,4 @@
+import { localFetch } from "./local-fetch.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
@@ -61,33 +62,33 @@ const post = (value) => ({ method: 'POST', headers: { 'content-type': 'applicati
 test('preview routes never sync; explicit upsert, list and get use only injected SDK catalog', async (t) => {
   const events = [];
   const s = await setup(t, { async upsert(input) { events.push('upsert'); return row(input); }, async list() { events.push('list'); return { materials: [row(record)], total: 1 }; }, async get() { events.push('get'); return row(record); } });
-  const config = await (await fetch(s.url+'/config')).json();
+  const config = await (await localFetch(s.url+'/config')).json();
   assert.equal(config.sdk.capabilities.filamentCatalog, true);
-  assert.equal((await fetch(s.url+'/catalog-sync/preview', post([record]))).status, 200);
+  assert.equal((await localFetch(s.url+'/catalog-sync/preview', post([record]))).status, 200);
   assert.deepEqual(events, []);
-  const formStyle = await fetch(s.url+'/catalog-sync/upsert', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify([record]) });
+  const formStyle = await localFetch(s.url+'/catalog-sync/upsert', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify([record]) });
   assert.equal(formStyle.status, 400); assert.deepEqual(events, []);
-  assert.equal((await fetch(s.url+'/catalog-sync/upsert', post([record]))).status, 200);
+  assert.equal((await localFetch(s.url+'/catalog-sync/upsert', post([record]))).status, 200);
   assert.deepEqual(events, ['upsert']);
-  assert.equal((await fetch(s.url+'/catalog-sync/list')).status, 200);
-  assert.equal((await fetch(s.url+`/catalog-sync/filaments/${id}`)).status, 200);
+  assert.equal((await localFetch(s.url+'/catalog-sync/list')).status, 200);
+  assert.equal((await localFetch(s.url+`/catalog-sync/filaments/${id}`)).status, 200);
   assert.deepEqual(events, ['upsert', 'list', 'get']);
   assert.equal(s.printCalls(), 0);
 });
 test('older SDK capability fails cleanly without HTTP fallback and preview remains read-only', async (t) => {
   const s = await setup(t, undefined);
-  assert.equal((await (await fetch(s.url+'/config')).json()).sdk.capabilities.filamentCatalog, false);
-  const preview = await (await fetch(s.url+'/catalog-sync/preview', post([record]))).json();
+  assert.equal((await (await localFetch(s.url+'/config')).json()).sdk.capabilities.filamentCatalog, false);
+  const preview = await (await localFetch(s.url+'/catalog-sync/preview', post([record]))).json();
   assert.equal(preview.available, false);
   for (const [path, options] of [['/catalog-sync/upsert', post([record])], ['/catalog-sync/list'], [`/catalog-sync/filaments/${id}`]]) {
-    const response = await fetch(s.url+path, options); assert.equal(response.status, 503); assert.match((await response.json()).error, /unavailable/);
+    const response = await localFetch(s.url+path, options); assert.equal(response.status, 503); assert.match((await response.json()).error, /unavailable/);
   }
   assert.equal(s.printCalls(), 0);
 });
 test('catalog HTTP errors and invalid JSON never expose upstream secrets', async (t) => {
   const s = await setup(t, { upsert() {}, async list() { throw Object.assign(new Error('private-key raw database'), { status: 403 }); }, async get() { throw new Error('private-key'); } });
-  const response = await fetch(s.url+'/catalog-sync/list');
+  const response = await localFetch(s.url+'/catalog-sync/list');
   assert.equal(response.status, 403); assert.deepEqual(await response.json(), { error: 'Hive filament catalog returned HTTP 403' });
-  const get = await fetch(s.url+`/catalog-sync/filaments/${id}`); assert.equal(get.status, 502); assert.equal((await get.text()).includes('private-key'), false);
-  const bad = await fetch(s.url+'/catalog-sync/preview', { method: 'POST', body: '{' }); assert.equal(bad.status, 400);
+  const get = await localFetch(s.url+`/catalog-sync/filaments/${id}`); assert.equal(get.status, 502); assert.equal((await get.text()).includes('private-key'), false);
+  const bad = await localFetch(s.url+'/catalog-sync/preview', { method: 'POST', body: '{' }); assert.equal(bad.status, 400);
 });

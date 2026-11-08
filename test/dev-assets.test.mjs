@@ -49,3 +49,26 @@ test("Vite serves the React entry and shared browser helpers without exposing or
       200,
     );
 });
+
+test('dev proxy supports the local session and rewrites Host while checking browser Origin', async t => {
+  const { createOrderServer } = await import('../src/server.mjs');
+  const { once } = await import('node:events');
+  const backend = createOrderServer({ hive: {}, browserOrigin: 'http://127.0.0.1:5173' });
+  backend.listen(0, '127.0.0.1'); await once(backend, 'listening');
+  const previous = process.env.API_PORT;
+  process.env.API_PORT = String(backend.address().port);
+  const vite = await createServer({ envFile: false, logLevel: 'silent', server: { port: 0, strictPort: false } });
+  t.after(async () => {
+    await vite.close(); backend.closeAllConnections(); backend.close();
+    if (previous === undefined) delete process.env.API_PORT; else process.env.API_PORT = previous;
+  });
+  await vite.listen();
+  const url = `http://127.0.0.1:${vite.httpServer.address().port}`;
+  const { token } = await (await fetch(url + '/session')).json();
+  assert.match(token, /^[a-f0-9]{64}$/);
+  const response = await fetch(url + '/config', { headers: { 'x-printhive-session': token, Origin: 'http://127.0.0.1:5173' } });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).sdk.version, '0.6.0');
+  assert.equal((await fetch(url + '/config')).status, 403);
+  assert.equal((await fetch(url + '/session', { headers: { Origin: 'https://example.invalid' } })).status, 403);
+});

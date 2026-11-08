@@ -33,3 +33,14 @@ export function pruneSlots<T>(
     ),
   };
 }
+
+export function selectedSourceGroups(plates: { number: number; sources: Source[] }[]) {
+  const groups = new Map<string, { source: Source; plates: number[] }>();
+  for (const plate of plates) for (const source of plate.sources) {
+    const key = sourceKey(source);
+    const group = groups.get(key) ?? { source, plates: [] };
+    group.plates.push(plate.number);
+    groups.set(key, group);
+  }
+  return [...groups.values()].sort((a, b) => a.source.sourceSlot - b.source.sourceSlot);
+}

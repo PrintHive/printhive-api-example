@@ -109,7 +109,7 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}) {
       plates: order.plates,
       ...(batch ? { plateMappings: order.plateMappings, plateRequirements: order.plateRequirements } : { filaments: order.filaments }),
       ...(order.projectData ? { projectData: order.projectData, catalogSelections: order.catalogSelections } : {}),
-      release: order.release ?? "automatic",
+      release: order.release ?? "manual",
       on_filament_mismatch: order.on_filament_mismatch ?? "wait",
       ...(order.printer_id ? { printer_id: order.printer_id } : {}),
     };
@@ -141,22 +141,31 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}) {
       };
       await save(record); // Durable keys BEFORE any outbound call.
     }
+    let submissionError;
     for (const item of record.plates) {
       if (item.requestId) continue;
-      const receipt = await hive.printJobs.create({
-        file: record.source,
-        filename: record.intent.filename,
-        plate: item.plate,
-        filaments: record.intent.plateRequirements?.find(p => p.plate === item.plate)?.filaments ?? record.intent.filaments,
-        release: record.intent.release,
-        ...(record.intent.on_filament_mismatch ? { on_filament_mismatch: record.intent.on_filament_mismatch } : {}),
-        ...(record.intent.printer_id ? { printer_id: record.intent.printer_id } : {}),
-        idempotencyKey: item.idempotencyKey,
-      });
-      item.requestId = receipt.requestId;
-      onReceipt(receipt);
-      await save(record);
+      try {
+        const receipt = await hive.printJobs.create({
+          file: record.source,
+          filename: record.intent.filename,
+          plate: item.plate,
+          filaments: record.intent.plateRequirements?.find(p => p.plate === item.plate)?.filaments ?? record.intent.filaments,
+          release: record.intent.release,
+          ...(record.intent.on_filament_mismatch ? { on_filament_mismatch: record.intent.on_filament_mismatch } : {}),
+          ...(record.intent.printer_id ? { printer_id: record.intent.printer_id } : {}),
+          idempotencyKey: item.idempotencyKey,
+        });
+        item.requestId = receipt.requestId;
+        delete item.error;
+        onReceipt(receipt);
+        await save(record);
+      } catch (error) {
+        item.error = { code: typeof error.code === "string" ? error.code : "submission_unreachable", message: "Not confirmed by Hive. Retry the same order with its saved key." };
+        await save(record);
+        submissionError ??= error;
+      }
     }
+    if (submissionError) throw submissionError;
     return record;
   }
   return {
@@ -171,8 +180,15 @@ export function createOrders(hive, directory = "data", onReceipt = () => {}) {
         id,
         plates: await Promise.all(
           record.plates.map(async (item) => {
-            const receipt = item.requestId ? await hive.printJobs.getCreateRequest(item.requestId) : { status: "pending_submission" };
-            return { plate: item.plate, ...receipt, jobRead: await readCreatedJob(hive, receipt) };
+            try {
+              const receipt = item.requestId ? await hive.printJobs.getCreateRequest(item.requestId) : { status: "pending_submission", error: item.error };
+              return { plate: item.plate, ...receipt, jobRead: await readCreatedJob(hive, receipt) };
+            } catch (error) {
+              return { plate: item.plate, requestId: item.requestId, status: "status_unavailable", error: {
+                code: typeof error.code === "string" ? error.code : "poll_unreachable",
+                message: "Could not refresh this plate. Polling will retry; do not resubmit a new order.",
+              } };
+            }
           }),
         ),
       };

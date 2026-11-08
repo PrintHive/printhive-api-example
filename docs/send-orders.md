@@ -2,7 +2,7 @@
 
 ## Use the CLI
 
-1. Set `PRINTHIVE_API_KEY` and `PRINTHIVE_BASE_URL` on the server.
+1. Set `PRINTHIVE_API_KEY_FILE` or `PRINTHIVE_API_KEY`, and `PRINTHIVE_BASE_URL` on the server.
 2. Review `fixtures/order.json`. Use mock printers and a local API for tests.
 3. Run `npm run send-print -- fixtures/order.json`.
 4. Read the returned request IDs. For a held request, inspect its required actions before release.
@@ -29,10 +29,12 @@ PORT=3081 npm start
 Open <http://127.0.0.1:3081>. To submit a server-side fixture directly:
 
 ```sh
+SESSION=$(curl --fail --silent http://127.0.0.1:3081/session | node -pe 'JSON.parse(require("fs").readFileSync(0, "utf8")).token')
 curl --fail-with-body http://127.0.0.1:3081/orders \
+  -H "X-PrintHive-Session: $SESSION" \
   -H 'Content-Type: application/json' \
   -d '{"id":"sample-1001","file":"cube.3mf","plates":[1],"filaments":[{"sourceSlot":0,"material":"PETG","color":"#39FF14"}],"release":"manual"}'
-curl --fail-with-body http://127.0.0.1:3081/orders/sample-1001
+curl --fail-with-body http://127.0.0.1:3081/orders/sample-1001 -H "X-PrintHive-Session: $SESSION"
 ```
 
 For browser uploads, send multipart `POST /orders` with an `order` JSON field and a `file` field. Keep the whole request below 16 MiB. JSON requests have a 64 KiB limit. Use `POST /orders/{id}/{plate}/release` or `/cancel` to control a request before job creation.

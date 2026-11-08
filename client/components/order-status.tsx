@@ -19,6 +19,7 @@ import {
 import { waitingFilamentInstructions } from "../../src/job-status.mjs";
 import { type OrderWorkflow } from "@/lib/use-order-workflow";
 import { SdkCall } from "./sdk-call";
+import { progressOf, rollUpProgress } from "@/lib/plate-progress";
 import { Color, ReportedColors } from "./color";
 
 const actionSchema = z.object({ code: z.string().optional() });
@@ -35,7 +36,8 @@ export function OrderStatus({ flow }: { flow: OrderWorkflow }) {
     : false;
   const releasable =
     receipt?.status === "held" &&
-    receipt.requiredActions.some((value) => {
+    receipt.requiredActions.length > 0 &&
+    receipt.requiredActions.every((value) => {
       const parsed = actionSchema.safeParse(value);
       return parsed.success && parsed.data.code === "manual_release_required";
     });
@@ -59,8 +61,8 @@ export function OrderStatus({ flow }: { flow: OrderWorkflow }) {
           Polls preparation once per second. A held request needs review; it is
           not a job.
         </SdkCall>
-        <SdkCall call="HTTP POST /v1/print-jobs/create-requests/{requestId}/release or /cancel">
-          The SDK has no release or cancel helper. This UI offers Release for
+        <SdkCall call="client.printJobs.releaseCreateRequest(requestId) or cancelCreateRequest(requestId)">
+          This UI offers Release for
           manual holds and Cancel before creation. The backend forwards the
           action. Hive decides whether to accept it.
         </SdkCall>
@@ -71,6 +73,16 @@ export function OrderStatus({ flow }: { flow: OrderWorkflow }) {
         {flow.active && (
           <div className="space-y-2">
             <h3 className="text-sm font-semibold">Selected plate requests</h3>
+            <p role="status" id="progress-summary" className="text-sm">{rollUpProgress(flow.order?.plates ?? [])}</p>
+            <ul className="space-y-2" aria-label="Per-plate progress">
+              {flow.order?.plates.map(plate => {
+                const progress = progressOf(plate);
+                return <li key={plate.plate} className="rounded-md border p-3 text-sm">
+                  <p className="font-medium">Plate {plate.plate}: {progress.label}</p>
+                  <p className="text-xs text-muted-foreground">{progress.reason}</p>
+                </li>;
+              })}
+            </ul>
             <div className="flex flex-wrap gap-2">
               {flow.active.plates.map((plate) => (
                 <Button

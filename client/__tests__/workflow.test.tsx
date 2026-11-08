@@ -42,6 +42,7 @@ function fixture(
 ) {
   const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input);
+    if (path === "/session") return Response.json({ token: "test-session" });
     const response = extra?.(path, init);
     if (response) return response;
     if (path === "/config") return Response.json(config);
@@ -63,6 +64,7 @@ describe("React order workflow", () => {
   it("loads the destination and blocks submission until a requirement is selected", async () => {
     const calls = fixture();
     render(<App />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Per-plate overrides" }));
     expect(await screen.findByText("Use Fixture PETG")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Submit order" })).toBeDisabled();
     const user = userEvent.setup();
@@ -103,6 +105,7 @@ describe("React order workflow", () => {
       });
     });
     render(<App />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Per-plate overrides" }));
     const user = userEvent.setup();
     await user.click(
       await screen.findByRole("button", { name: "Use Fixture PETG" }),
@@ -177,6 +180,7 @@ describe("React order workflow", () => {
         });
     });
     render(<App />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Per-plate overrides" }));
     const user = userEvent.setup();
     await user.click(
       await screen.findByRole("button", { name: "Use Fixture PETG" }),
@@ -213,6 +217,7 @@ it("searches printers by free text and uses the selected UUID", async () => {
     });
   });
   render(<App />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Per-plate overrides" }));
   const user = userEvent.setup();
   await user.type(
     screen.getByLabelText("Find a printer by name or model"),
@@ -253,6 +258,7 @@ it("shows SDK search results but disables filaments not accepted by create", asy
     });
   });
   render(<App />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Per-plate overrides" }));
   expect(
     await screen.findByRole("button", { name: "Use Fixture PETG" }),
   ).toBeEnabled();
@@ -284,6 +290,7 @@ it("selects an eligible global filament and previews its catalog ID", async () =
   });
   const user = userEvent.setup();
   render(<App />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Per-plate overrides" }));
   const choose = await screen.findByRole("button", { name: "Use Generic PETG-CF" });
   expect(choose).toBeEnabled();
   await user.click(choose);
@@ -388,6 +395,7 @@ it("selects preview cards, preserves per-plate mappings, and controls each submi
       });
   });
   render(<App />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Per-plate overrides" }));
   const user = userEvent.setup();
   await user.upload(
     screen.getByLabelText("Project 3MF"),

@@ -4,6 +4,7 @@ import { createSearch } from "./search.mjs";
 import { sdkInfo } from "./sdk-info.mjs";
 import { mappedPlateInputs, resolveMappedPlates } from "./mapped-plates.mjs";
 import { inspectProject } from "./project-inspection.mjs";
+import { randomBytes } from "node:crypto";
 import { createHash } from "node:crypto";
 import { validateCatalogQuery } from "./catalog.mjs";
 import { resolveMappedInput, validateMappedInput } from "./project-data.mjs";
@@ -29,7 +30,7 @@ async function readBody(req, limit) {
   return Buffer.concat(chunks);
 }
 
-export function createOrderServer({ hive, control, catalog, directory = "data", designs = "fixtures", baseUrl = "https://api.printhiv3d.com", frontendDirectory = builtFrontend }) {
+export function createOrderServer({ hive, control, catalog, directory = "data", designs = "fixtures", baseUrl = "https://api.printhiv3d.com", frontendDirectory = builtFrontend, browserOrigin }) {
   const orders = createOrders(hive, directory);
   const sync = createCatalogSync(hive);
   const searchAdapter = createSearch(hive);
@@ -38,6 +39,7 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
   const target = new URL(baseUrl);
   const displayUrl = target.origin + target.pathname.replace(/\/$/, "");
   const production = target.hostname === "api.printhiv3d.com";
+  const sessionToken = randomBytes(32).toString("hex");
   return createServer(async (req, res) => {
     const reply = (code, body) => {
       res.writeHead(code, { "content-type": "application/json", "cache-control": "no-store" });
@@ -45,9 +47,18 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
     };
     let temporary;
     try {
+      const port = req.socket.localPort;
+      const hosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
+      if (!hosts.has(req.headers.host)) return reply(403, { error: "Untrusted Host" });
+      const origins = new Set([...hosts].map(host => `http://${host}`));
+      if (browserOrigin) origins.add(browserOrigin);
+      if (req.headers.origin && !origins.has(req.headers.origin)) return reply(403, { error: "Untrusted Origin" });
+      if (req.headers["sec-fetch-site"] === "cross-site") return reply(403, { error: "Cross-site request refused" });
       const pathname = new URL(req.url, "http://localhost").pathname;
+      if (req.method === "GET" && pathname === "/session") return reply(200, { token: sessionToken });
       const parts = pathname.split("/").filter(Boolean).map(decodeURIComponent);
       if (req.method === "GET" && await serveWebAsset(pathname, res, frontendDirectory)) return;
+      if (req.headers["x-printhive-session"] !== sessionToken) return reply(403, { error: "Missing or invalid session header. Reload the sample." });
       if (pathname.startsWith("/catalog-sync/")) {
         try {
           if (req.method === "POST" && ["/catalog-sync/preview", "/catalog-sync/upsert"].includes(pathname)) {
@@ -175,6 +186,7 @@ export function createOrderServer({ hive, control, catalog, directory = "data", 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const server = createOrderServer({
     ...clientFromEnv(),
+    browserOrigin: process.env.PRINTHIVE_BROWSER_ORIGIN,
     directory: process.env.ORDER_DATA_DIR ?? "data",
     designs: process.env.DESIGN_DIR ?? "fixtures",
     baseUrl: process.env.PRINTHIVE_BASE_URL ?? "https://api.printhiv3d.com",

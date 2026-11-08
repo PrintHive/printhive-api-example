@@ -3,7 +3,7 @@ import { z } from "zod";
 import { validateProjectData } from "../../src/project-data.mjs";
 import { mappedPlateInputs } from "../../src/mapped-plates.mjs";
 import { shouldPollJob } from "../../src/job-status.mjs";
-import { pruneSlots, sharedSourcePlates } from "./material-assignments";
+import { pruneSlots, sharedSourcePlates, selectedSourceGroups } from "./material-assignments";
 import {
   acceptedSchema,
   api,
@@ -45,6 +45,9 @@ export function useOrderWorkflow() {
   const [hints, setHints] = useState<Record<number, Record<number, Hint>>>({});
   const [bulkNotice, setBulkNotice] = useState("");
   const [printer, setPrinter] = useState("");
+  const [printerName, setPrinterName] = useState("");
+  const [mappingMode, setMappingMode] = useState<"selected" | "plate">("selected");
+  const [automaticConfirmation, setAutomaticConfirmation] = useState<string | null>(null);
   const [release, setRelease] = useState("manual");
   const [policy, setPolicy] = useState("wait");
   const [manifest, setManifest] = useState("");
@@ -120,6 +123,22 @@ export function useOrderWorkflow() {
     );
   };
   const currentSources = plateSources(plateNumber);
+  const sourceGroups = selectedSourceGroups(selectedPlates.map(number => ({ number, sources: plateSources(number) })));
+  function chooseGroup(source: Source, material: Material) {
+    const group = sourceGroups.find(group => group.source === source);
+    if (!group) return;
+    setSelections(previous => {
+      const next = { ...previous };
+      for (const number of group.plates) next[number] = { ...next[number], [source.sourceSlot]: material };
+      return next;
+    });
+    invalidate();
+  }
+  function groupSelection(source: Source, plates: number[]) {
+    const choices = plates.map(number => selections[number]?.[source.sourceSlot]);
+    const first = choices[0];
+    return first && choices.every(choice => choice?.id === first.id) ? first : undefined;
+  }
   const bulkTargets = (slot: number): number[] => {
     const anchor = currentSources.find((s) => s.sourceSlot === slot);
     if (!anchor || !currentSelections[slot]) return [];
@@ -134,6 +153,7 @@ export function useOrderWorkflow() {
     previewGeneration.current++;
     previewController.current?.abort();
     setPayload(null);
+    setAutomaticConfirmation(null);
     setPreviewBusy(false);
   }, []);
   const clearProject = useCallback(() => {
@@ -306,6 +326,21 @@ export function useOrderWorkflow() {
     setHints((p) => pruneSlots(p, plateNumber, kept));
     invalidate();
   }
+  function confirmSelectedUsage() {
+    if (!extracted) return;
+    setConfirmed(previous => {
+      const next = { ...previous };
+      for (const number of selectedPlates) {
+        const usage = usageFor(number);
+        if (usage?.kind !== "detected" || !usage.sourceSlots?.length || drafts[number]) continue;
+        const values = extracted.palette.filter(source => usage.sourceSlots?.includes(source.sourceSlot));
+        if (values.length === usage.sourceSlots.length && values.every(source => source.selectable))
+          next[number] = plateSchema.parse({ number, filaments: values });
+      }
+      return next;
+    });
+    invalidate();
+  }
   function applyToMatching(slot: number) {
     const material = currentSelections[slot];
     const targets = bulkTargets(slot);
@@ -439,7 +474,7 @@ export function useOrderWorkflow() {
       }
     }
   }, []);
-  async function submit() {
+  async function submit(automaticConfirmed = false) {
     if (locked.current || !config) return;
     locked.current = true;
     setBusy(true);
@@ -449,6 +484,13 @@ export function useOrderWorkflow() {
       let current = activeRef.current;
       if (!current) {
         const input = currentInput();
+        if (release === "automatic" && printer.trim() && !printerName)
+          throw new Error("For automatic release, choose the printer through search so the confirmation names its destination.");
+        if (release === "automatic" && !automaticConfirmed) {
+          setAutomaticConfirmation(printer.trim() ? printerName : "Smart Queue");
+          return;
+        }
+        setAutomaticConfirmation(null);
         let options: RequestInit;
         if (file) {
           const body = new FormData();
@@ -519,6 +561,22 @@ export function useOrderWorkflow() {
       invalidate();
     },
     currentSources,
+    sourceGroups,
+    chooseGroup,
+    groupSelection,
+    groupHint: (source: Source, plates: number[]) => hints[plates[0] ?? 0]?.[source.sourceSlot],
+    setGroupHint: (source: Source, plates: number[], hint: Hint) => {
+      setHints(previous => {
+        const next = { ...previous };
+        for (const number of plates) next[number] = { ...next[number], [source.sourceSlot]: hint };
+        return next;
+      });
+      invalidate();
+    },
+    mappingMode,
+    setMappingMode,
+    confirmSelectedUsage,
+    printerName,
     bulkTargets,
     bulkNotice,
     confirmed,
@@ -531,6 +589,9 @@ export function useOrderWorkflow() {
     hints: hints[plateNumber] ?? {},
     printer,
     release,
+    automaticConfirmation,
+    cancelAutomatic: () => setAutomaticConfirmation(null),
+    confirmAutomatic: () => submit(true),
     policy,
     manifest,
     projectError,
@@ -558,8 +619,9 @@ export function useOrderWorkflow() {
       setPlateNumber(number);
       invalidate();
     },
-    setPrinter: (value: string) => {
+    setPrinter: (value: string, name = "") => {
       setPrinter(value);
+      setPrinterName(name);
       invalidate();
     },
     setRelease: (value: string) => {

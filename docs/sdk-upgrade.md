@@ -1,6 +1,6 @@
 # SDK calls used by this sample
 
-The manifest and lockfile pin the published npm registry package `@printhive/api@0.4.1`. The Node backend owns every SDK call. The browser receives no API credential. No local SDK build or HTTP search fallback is required.
+The manifest and lockfile pin the published npm registry package `@printhive/api@0.6.0`. The Node backend owns every SDK call. The browser receives no API credential. No local SDK build or HTTP search fallback is required.
 
 | UI operation | Backend call | Result |
 | --- | --- | --- |
@@ -10,14 +10,14 @@ The manifest and lockfile pin the published npm registry package `@printhive/api
 | Preview selected plates | Local mapping validation | Source slots, catalog IDs, and optional placement hints |
 | Submit selected plates | `client.printJobs.create` once per plate | Hive resolves catalog material and color; separate creation request IDs |
 | Read preparation | `client.printJobs.getCreateRequest(requestId)` | Preparing, held, failed, cancelled, or created receipt |
-| Release or cancel | Server-only HTTP helper | Updated receipt; the SDK has no helper |
+| Release or cancel | `client.printJobs.releaseCreateRequest` or `.cancelCreateRequest` | Authorization or cancellation result; refresh the receipt |
 | Follow a created job | `client.printJobs.get(jobId)` | Live job state and unmet filament requirements |
 | CLI wait | `client.printJobs.waitUntilCreated(requestId)` | Created receipt or `PrintJobCreateStoppedError` |
 | Sync catalog | `client.filamentCatalog.upsert`, `.list`, `.get` | Organization catalog bindings |
 
 ## Search contract
 
-SDK 0.4.1 uses `GET /v1/printers/search` and `GET /v1/filaments/search`. Both methods accept `{ query, limit?, offset?, signal? }` and use the SDK's authenticated transport, retries, and response validation. The sample adapter adds only input bounds and UI field projection. It does not implement matching or ranking.
+SDK 0.6.0 uses `GET /v1/printers/search` and `GET /v1/filaments/search`. Both methods accept `{ query, limit?, offset?, signal? }` and use the SDK's authenticated transport, retries, and response validation. The sample adapter adds only input bounds and UI field projection. It does not implement matching or ranking.
 
 Example queries are `black PETG`, `bambu red`, and `Boo P1S`. Filament results retain the API's `hasMore` and `matchMode`. A broadened response is labeled in the UI. Printer pagination uses the returned total.
 
@@ -45,6 +45,12 @@ The sample preserves these creation errors without exposing upstream response bo
 | 503 | `catalog_store_failed` | Hive cannot read the catalog or organization settings. A failed settings read never defaults to enabled. |
 
 The SDK retries eligible 503 failures with the same idempotency key. If retries are exhausted, the sample returns HTTP 503 with `code: "catalog_store_failed"` and `upstreamStatus: 503`. The saved order remains available for an unchanged retry.
+
+## Start Print adaptations
+
+The selected-slot union follows `toProjectFilaments` from Hive PR #5187's `projectSource.ts`. Per-plate requirements follow `slicePlan.ts`. The progress summary, independent plate failures, and release-only manual holds adapt `ledger.ts` and `submission.ts` from that PR. PR #5190's project dialog informed the combined plate/material/destination flow. The existing sample's saved multipart source and per-plate keys remain its transport.
+
+The published SDK also has `printJobs.plan`, but this sample keeps explicit printer search and API-reported waiting reasons. It does not claim plan suggestions prove readiness. PR #5191's recovered batch history and source-version creation need unmerged API endpoints, so they are not ported. The local metadata reader does not copy the full painted/support slot resolver. Unknown usage stays explicit and blocks submission until supplied or confirmed.
 
 ## Shared source assignments
 

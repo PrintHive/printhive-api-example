@@ -1,3 +1,4 @@
+import { localFetch } from "./local-fetch.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -175,6 +176,6 @@ test('HTTP reject response preserves 422 and safe API code without leaking upstr
   const server = createOrderServer({ directory, hive: { printJobs: { create: async () => { throw Object.assign(new Error('private upstream details'), { status: 422, code: 'filament_mismatch' }); } } } });
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   t.after(async () => { server.closeAllConnections(); await new Promise(r => server.close(r)); });
-  const response = await fetch(`http://127.0.0.1:${server.address().port}/orders`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...input, file: 'cube.3mf', on_filament_mismatch: 'reject' }) });
+  const response = await localFetch(`http://127.0.0.1:${server.address().port}/orders`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...input, file: 'cube.3mf', on_filament_mismatch: 'reject' }) });
   assert.equal(response.status, 422); const body = await response.json(); assert.equal(body.code, 'filament_mismatch'); assert.equal(JSON.stringify(body).includes('private'), false);
 });

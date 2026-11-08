@@ -28,10 +28,10 @@ export default defineConfig({
       deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**", "**/data/**"],
     },
     proxy: Object.fromEntries(
-      ["/config", "/project-data", "/orders", "/catalog", "/catalog-sync", "/printers"].map(
+      ["/session", "/config", "/project-data", "/orders", "/catalog", "/catalog-sync", "/printers"].map(
         (prefix) => [
           prefix,
-          "http://127.0.0.1:" + (process.env.API_PORT || "3078"),
+          { target: "http://127.0.0.1:" + (process.env.API_PORT || "3078"), changeOrigin: true },
         ],
       ),
     ),
